@@ -87,6 +87,20 @@ const ZH = {
   copyPrompt: '复制 Prompt', aiOutput: '输出', aiFailed: '失败', aiRequirementPh: '例如：把口头需求整理成 PRD 并拆解成开发任务',
   kitMissing: 'dsh-plugin-kit 未内联（构建问题）', nameRule: '名称不能为空、不能含 / 或 \\、不能以点开头',
   sessionUnavailable: '当前页面拿不到会话服务，无法跳转',
+  viewLib: '工艺库', viewExec: '执行',
+  runCreate: '▶ 按工艺执行', runWorkspace: '工作区（可选）', runStarted: '运行已发起',
+  workspaceDefault: '默认（不绑定）',
+  statusQueued: '排队中', statusRunning: '运行中', statusPaused: '已暂停', statusAwaiting: '等待裁决',
+  statusDone: '已完成', statusStopped: '已停止', statusFailed: '失败',
+  pause: '暂停', resume: '继续', stopRun: '停止运行', stopConfirm: '停止后当前环节结果作废，确定停止？',
+  noRuns: '还没有运行记录', noRunsHint: '到「工艺库」打开一个工艺，点「▶ 按工艺执行」发起一次运行',
+  emptyRun: '左侧选择一次运行查看看板',
+  progress: '{done}/{total} 环节', attemptN: '第 {n} 次尝试', reworkN: '返工 ×{n}',
+  gateLabel: '门禁', gateScore: '{score} 分（线 {min}）',
+  openSession: '打开会话', outputLabel: '实时输出', retryLink: '重跑本环节', skipLink: '跳过本环节',
+  breakTitle: '门禁未过，等待你的裁决', decisionRetry: '重试本环节', decisionSkip: '跳过本环节', decisionStop: '中止运行',
+  linkPending: '待跑', linkDone: '完成', linkRunning: '进行中', linkGateFailed: '门禁未过', linkSkipped: '跳过', linkFailed: '失败', linkAbandoned: '中断',
+  currentStep: '当前', runError: '运行异常',
 }
 
 const EN = {
@@ -137,6 +151,20 @@ const EN = {
   copyPrompt: 'Copy prompt', aiOutput: 'Output', aiFailed: 'Failed', aiRequirementPh: 'e.g. turn a verbal requirement into a PRD and split it into dev tasks',
   kitMissing: 'dsh-plugin-kit not inlined (build issue)', nameRule: 'Name must be non-empty, without / or \\, and not start with a dot',
   sessionUnavailable: 'Session service unavailable on this page',
+  viewLib: 'Library', viewExec: 'Runs',
+  runCreate: '▶ Run process', runWorkspace: 'Workspace (optional)', runStarted: 'Run started',
+  workspaceDefault: 'Default (unbound)',
+  statusQueued: 'Queued', statusRunning: 'Running', statusPaused: 'Paused', statusAwaiting: 'Awaiting decision',
+  statusDone: 'Done', statusStopped: 'Stopped', statusFailed: 'Failed',
+  pause: 'Pause', resume: 'Resume', stopRun: 'Stop run', stopConfirm: 'The running link result will be discarded. Stop?',
+  noRuns: 'No runs yet', noRunsHint: 'Open a process in "Library" and click "▶ Run process"',
+  emptyRun: 'Pick a run on the left to see its board',
+  progress: '{done}/{total} links', attemptN: 'attempt {n}', reworkN: 'rework ×{n}',
+  gateLabel: 'Gate', gateScore: '{score} (min {min})',
+  openSession: 'Open chat', outputLabel: 'Live output', retryLink: 'Retry link', skipLink: 'Skip link',
+  breakTitle: 'Gate failed — awaiting your decision', decisionRetry: 'Retry this link', decisionSkip: 'Skip this link', decisionStop: 'Stop run',
+  linkPending: 'pending', linkDone: 'done', linkRunning: 'running', linkGateFailed: 'gate failed', linkSkipped: 'skipped', linkFailed: 'failed', linkAbandoned: 'abandoned',
+  currentStep: 'current', runError: 'run error',
 }
 
 function makeT(bound) {
@@ -262,6 +290,31 @@ const STYLE = `
 .dsh-prc-drop[data-over="true"] { border-color:var(--dsw-alias-brand-primary, #3e63dd); }
 .dsh-prc-sec { margin:10px 0; }
 .dsh-prc-sec h4 { margin:0 0 6px; font-size:13px; }
+
+.dsh-prc-runlist { width:280px; min-width:220px; overflow-y:auto; border-right:1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.35)); padding:6px; box-sizing:border-box; }
+.dsh-prc-runrow { display:flex; flex-direction:column; gap:3px; width:100%; text-align:left; border:1px solid transparent; border-radius:8px; background:transparent; color:inherit; padding:7px 9px; margin:2px 0; cursor:pointer; font:inherit; font-size:12px; box-sizing:border-box; }
+.dsh-prc-runrow:hover { background:var(--dsw-hover, rgba(128,128,128,.1)); }
+.dsh-prc-runrow[data-selected="true"] { background:var(--dsw-active, rgba(128,128,128,.16)); border-color:var(--dsw-alias-border-l2, rgba(128,128,128,.3)); }
+.dsh-prc-pill { border-radius:999px; padding:1px 8px; font-size:10px; white-space:nowrap; border:1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.3)); }
+.dsh-prc-pill[data-status="running"] { color:#d9822b; border-color:#d9822b; }
+.dsh-prc-pill[data-status="queued"] { color:#3e63dd; border-color:#3e63dd; }
+.dsh-prc-pill[data-status="awaiting"] { color:#c75050; border-color:#c75050; }
+.dsh-prc-pill[data-status="paused"] { color:#b8860b; border-color:#b8860b; }
+.dsh-prc-pill[data-status="done"] { color:#2e9e5b; border-color:#2e9e5b; }
+.dsh-prc-pill[data-status="stopped"] { color:var(--dsw-text-secondary, gray); }
+.dsh-prc-pill[data-status="failed"] { color:var(--dsw-alias-state-error, #c75050); border-color:var(--dsw-alias-state-error, #c75050); }
+.dsh-prc-board { flex:1; min-width:0; overflow-y:auto; padding:14px 18px; box-sizing:border-box; }
+.dsh-prc-runhead { display:flex; align-items:flex-start; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+.dsh-prc-break { border:1px solid var(--dsw-alias-state-error, #c75050); border-radius:10px; padding:10px 12px; margin:8px 0; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.dsh-prc-linkcard { border:1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.3)); border-radius:8px; padding:6px 9px; margin:4px 0; display:flex; flex-direction:column; gap:4px; }
+.dsh-prc-linkcard[data-state="running"] { border-color:#d9822b; }
+.dsh-prc-linkcard[data-state="done"] { opacity:.82; }
+.dsh-prc-linkcard[data-state="gate_failed"] { border-color:var(--dsw-alias-state-error, #c75050); }
+.dsh-prc-linktop { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+.dsh-prc-linktop .grow { flex:1; }
+.dsh-prc-mini { border:1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.3)); background:transparent; color:inherit; border-radius:6px; padding:2px 7px; font:inherit; font-size:11px; cursor:pointer; white-space:nowrap; }
+.dsh-prc-mini:hover { background:var(--dsw-hover, rgba(128,128,128,.12)); }
+.dsh-prc-tail { max-height:180px; overflow:auto; margin:0; }
 `
 
 let stylesInjected = false
@@ -317,6 +370,9 @@ function initialState() {
     dialog: null,
     toast: null,
     settings: undefined,
+    view: prefs.view || 'lib',
+    runs: { revision: -1, list: [] },
+    runId: prefs.runId, run: undefined, runLoading: false,
   }
 }
 
@@ -326,6 +382,7 @@ class Controller {
     this.subs = new Set()
     this.es = null
     this.seenRevision = undefined
+    this.seenRunsRevision = undefined
     this.refreshInFlight = null
     this.validateTimer = null
     this.toastTimer = null
@@ -337,7 +394,7 @@ class Controller {
   emit() { if (this.disposed) return; for (const fn of this.subs) { try { fn() } catch {} } }
   persist() {
     const s = this.state
-    savePrefs({ selectedId: s.selectedId, tab: s.tab, filters: s.filters, sortBy: s.sortBy })
+    savePrefs({ selectedId: s.selectedId, tab: s.tab, filters: s.filters, sortBy: s.sortBy, view: s.view, runId: s.runId })
   }
   toast(text, kind) {
     this.setState({ toast: { text, kind: kind || 'ok' } })
@@ -352,14 +409,12 @@ class Controller {
   connectStream() {
     const es = new EventSource(API + '/events')
     this.es = es
-    es.addEventListener('hello', (e) => {
-      try { this.seenRevision = JSON.parse(e.data).revision } catch {}
+    const onFrame = (e) => {
+      try { const d = JSON.parse(e.data); this.seenRevision = d.revision; this.seenRunsRevision = d.runsRevision } catch {}
       void this.refresh()
-    })
-    es.addEventListener('change', (e) => {
-      try { this.seenRevision = JSON.parse(e.data).revision } catch {}
-      void this.refresh()
-    })
+    }
+    es.addEventListener('hello', onFrame)
+    es.addEventListener('change', onFrame)
     es.onerror = () => { /* EventSource 自动重连；hello 里对齐 gap */ }
   }
   async refresh() {
@@ -369,14 +424,23 @@ class Controller {
         let snap
         // revision 追赶：变更帧落在请求飞行中时，旧响应可能落后（taskboard S16）
         for (let round = 0; round < 3; round++) {
-          snap = await api('/state')
+          const [stateRsp, runsRsp] = await Promise.all([api('/state'), api('/runs')])
+          snap = stateRsp
           const keep = this.state.selectedId && snap.processes.some((p) => p.id === this.state.selectedId)
             ? this.state.selectedId : undefined
           this.setState({
             loaded: true, revision: snap.revision, roots: snap.roots, processes: snap.processes,
             lastError: snap.lastError, error: undefined, selectedId: keep,
+            runs: { revision: runsRsp.revision, list: runsRsp.runs },
           })
-          if (this.seenRevision === undefined || snap.revision >= this.seenRevision) break
+          const libCaughtUp = this.seenRevision === undefined || snap.revision >= this.seenRevision
+          const runsCaughtUp = this.seenRunsRevision === undefined || runsRsp.revision >= this.seenRunsRevision
+          if (libCaughtUp && runsCaughtUp) break
+        }
+        // 运行看板：活跃运行随帧刷新；静态运行只取一次
+        if (this.state.view === 'exec' && this.state.runId) {
+          const active = ['queued', 'running', 'awaiting'].includes((this.state.run && this.state.run.status) || '')
+          if (active || !this.state.run) void this.loadRun(this.state.runId)
         }
         // 选中项跟随外部改动：非编辑态自动刷新；编辑态不打断（保存时乐观锁兜底）
         if (this.state.selectedId && !this.state.itemLoading) {
@@ -574,6 +638,38 @@ class Controller {
   }
   aiRun(prompt) { return api('/ai-generate', { method: 'POST', body: { prompt } }).then((d) => d.jobId) }
   aiPoll(jobId) { return api('/jobs?id=' + encodeURIComponent(jobId)) }
+
+  // ── 执行视图（v0.2）──
+  setView(view) { this.setState({ view }); this.persist() }
+  selectRun(id) {
+    if (!id) return
+    this.setState({ runId: id, run: undefined, runLoading: true })
+    this.persist()
+    void this.loadRun(id)
+  }
+  async loadRun(id) {
+    try {
+      const d = await api('/run?id=' + encodeURIComponent(id))
+      if (this.state.runId !== id) return
+      this.setState({ run: d.run, runLoading: false })
+    } catch (error) {
+      if (this.state.runId === id) this.setState({ runLoading: false, error: String(error && error.message || error) })
+    }
+  }
+  async runAction(action, body) {
+    const d = await api('/run-action', { method: 'POST', body: { action, ...body } })
+    if (this.state.runId === d.run.id) void this.loadRun(d.run.id)
+    void this.refresh()
+    return d.run
+  }
+  async createRun(body) {
+    const d = await api('/run-create', { method: 'POST', body })
+    this.setState({ dialog: null, view: 'exec', runId: d.run.id, run: undefined, runLoading: true })
+    this.persist()
+    void this.loadRun(d.run.id)
+    this.toast(this.tr('runStarted'))
+    return d.run
+  }
 }
 
 // ── 侧栏入口行（DOM 注入，taskboard 家族同款） ─────────────────────────────
@@ -804,6 +900,9 @@ function Toolbar({ state, controller, t }) {
   return h('div', { className: 'dsh-prc-toolbar' },
     h('h2', { className: 'dsh-prc-title' }, t('title')),
     h('span', { className: 'dsh-prc-count' }, t('count', { user, bundled })),
+    h('div', { className: 'dsh-prc-tabs', style: { borderBottom: 'none', margin: '0 4px' } },
+      h('button', { className: 'dsh-prc-tab', 'data-on': state.view === 'lib' ? 'true' : undefined, onClick: () => controller.setView('lib') }, t('viewLib')),
+      h('button', { className: 'dsh-prc-tab', 'data-on': state.view === 'exec' ? 'true' : undefined, onClick: () => controller.setView('exec') }, t('viewExec'))),
     h('input', { className: 'dsh-prc-input dsh-prc-search', value: state.search, placeholder: t('searchPlaceholder'), spellCheck: false, onChange: (e) => controller.setSearch(e.target.value) }),
     h('select', { className: 'dsh-prc-select', value: state.filters.source, onChange: (e) => controller.setFilter('source', e.target.value) },
       h('option', { value: 'all' }, t('filterAll')), h('option', { value: 'user' }, t('filterUser')), h('option', { value: 'bundled' }, t('filterBundled'))),
@@ -993,6 +1092,7 @@ function DetailPane({ state, controller, t }) {
         ] : [
           h('button', { key: 'c', className: 'dsh-prc-btn', 'data-primary': 'true', onClick: () => controller.setState({ dialog: { type: 'copy', fromId: meta.id } }) }, '⧉ ' + t('copyToMine')),
         ],
+        h('button', { key: 'r', className: 'dsh-prc-btn', 'data-primary': 'true', title: t('runCreate'), onClick: () => controller.setState({ dialog: { type: 'newrun', processId: meta.id } }) }, t('runCreate')),
         h('button', { key: 'x', className: 'dsh-prc-btn', onClick: copyYaml }, t('copyYaml')))),
     h('div', { className: 'dsh-prc-chips' },
       h('span', { className: 'dsh-prc-chip' }, isUser ? t('mine') : t('readOnly')),
@@ -1342,8 +1442,7 @@ function ProcessPanel({ controller, t, slotProps }) {
     state.error ? h('div', { className: 'dsh-prc-error' }, state.error) : null,
     state.lastError ? h('div', { className: 'dsh-prc-error' }, 'store: ' + state.lastError) : null,
     h('div', { className: 'dsh-prc-body' },
-      h(ListPane, { state, controller, t }),
-      detail),
+      state.view === 'exec' ? h(ExecView, { state, controller, t }) : h('div', { style: { display: 'contents' } }, h(ListPane, { state, controller, t }), detail)),
     state.dialog && state.dialog.type === 'create' ? h(CreateDialog, { state, controller, t }) : null,
     state.dialog && state.dialog.type === 'copy' ? h(CopyDialog, { state, controller, t }) : null,
     state.dialog && state.dialog.type === 'rename' ? h(RenameDialog, { state, controller, t }) : null,
@@ -1351,7 +1450,170 @@ function ProcessPanel({ controller, t, slotProps }) {
     state.dialog && state.dialog.type === 'import' ? h(ImportDialog, { state, controller, t }) : null,
     state.dialog && state.dialog.type === 'settings' ? h(SettingsDialog, { state, controller, t }) : null,
     state.dialog && state.dialog.type === 'ai' ? h(AiDialog, { state, controller, t }) : null,
+    state.dialog && state.dialog.type === 'newrun' ? h(NewRunDialog, { state, controller, t }) : null,
     state.toast ? h('div', { className: 'dsh-prc-toast', 'data-kind': state.toast.kind }, state.toast.text) : null)
+}
+
+// ── 执行视图（v0.2）─────────────────────────────────────────────────────
+
+const LINK_STATE_KEY = { running: 'linkRunning', done: 'linkDone', gate_failed: 'linkGateFailed', skipped: 'linkSkipped', failed: 'linkFailed', abandoned: 'linkAbandoned' }
+
+function StatusPill({ t, status }) {
+  return h('span', { className: 'dsh-prc-pill', 'data-status': status }, t('status' + status[0].toUpperCase() + status.slice(1)))
+}
+
+/** 每个环节的最新一次执行记录。 */
+function latestAttempts(run) {
+  const map = new Map()
+  for (const t of run.trail || []) {
+    const prev = map.get(t.linkId)
+    if (!prev || t.startedAt >= prev.startedAt) {
+      // 最新记录缺 sessionId（如 skip 记录）时继承上一次的，跳转会话不丢
+      map.set(t.linkId, !t.sessionId && prev && prev.sessionId ? { ...t, sessionId: prev.sessionId } : t)
+    }
+  }
+  return map
+}
+
+function runProgress(run) {
+  const latest = latestAttempts(run)
+  const total = new Set([...indexLinksOf(run).keys()]).size
+  let done = 0
+  for (const [linkId] of indexLinksOf(run)) {
+    const st = latest.get(linkId) && latest.get(linkId).status
+    if (st === 'done' || st === 'skipped') done++
+  }
+  return { done, total }
+}
+function indexLinksOf(run) {
+  const phases = run.snapshot && Array.isArray(run.snapshot.phases) ? run.snapshot.phases : []
+  const map = new Map()
+  for (const ph of phases) for (const ln of (Array.isArray(ph.links) ? ph.links : [])) if (ln.id) map.set(ln.id, { phase: ph, link: ln })
+  return map
+}
+
+function RunList({ state, controller, t }) {
+  const runs = state.runs.list
+  return h('div', { className: 'dsh-prc-runlist' },
+    runs.length === 0
+      ? h('div', { style: { padding: '16px 8px', color: 'var(--dsw-text-secondary, gray)', fontSize: 12 } }, t('noRuns'), h('div', { style: { marginTop: 4, opacity: .8 } }, t('noRunsHint')))
+      : runs.map((r) => h('button', {
+        key: r.id, className: 'dsh-prc-runrow', 'data-selected': state.runId === r.id ? 'true' : undefined,
+        onClick: () => controller.selectRun(r.id),
+      },
+      h('div', { style: { display: 'flex', gap: 6, alignItems: 'center' } },
+        h('span', { className: 'dsh-prc-pill', 'data-status': r.status }, t('status' + r.status[0].toUpperCase() + r.status.slice(1))),
+        h('span', { style: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 } }, r.displayName || r.processName)),
+      h('div', { style: { display: 'flex', gap: 6, color: 'var(--dsw-text-secondary, gray)', fontSize: 11 } },
+        h('span', null, t('progress', { done: r.doneLinks, total: r.totalLinks })),
+        h('span', null, new Date(r.updatedAt).toLocaleTimeString())))))
+}
+
+function LinkCard({ t, run, phase, link, attempt, controller }) {
+  const [open, setOpen] = useState(false)
+  const st = attempt ? attempt.status : 'pending'
+  const isCurrent = run.current && run.current.linkId === link.id && ['running', 'queued', 'awaiting'].includes(run.status)
+  const rework = (run.rework && run.rework[link.id]) || 0
+  const active = ['queued', 'running', 'awaiting', 'paused'].includes(run.status)
+  return h('div', { className: 'dsh-prc-linkcard', 'data-state': st },
+    h('div', { className: 'dsh-prc-linktop' },
+      h('span', { className: 'dsh-prc-link-id' }, link.id),
+      h('span', { style: { fontWeight: 500 } }, link.name || ''),
+      isCurrent ? h('span', { className: 'dsh-prc-badge', 'data-kind': 'warn' }, t('currentStep')) : null,
+      h('span', { className: 'grow' }),
+      attempt && attempt.attempt > 1 ? h('span', { style: { fontSize: 11, opacity: .7 } }, t('attemptN', { n: attempt.attempt })) : null,
+      rework > 0 ? h('span', { style: { fontSize: 11, color: '#b8860b' } }, t('reworkN', { n: rework })) : null,
+      attempt && attempt.gate && attempt.gate.score !== null && attempt.gate.score !== undefined
+        ? h('span', { className: 'dsh-prc-badge', 'data-kind': attempt.gate.score >= (attempt.gate.minScore || 0) ? 'ok' : 'err', title: attempt.gate.reason },
+          t('gateLabel') + ' ' + attempt.gate.score + ' / ' + (attempt.gate.minScore || 0)) : null,
+      h('span', { style: { fontSize: 11, opacity: .75 } }, t(LINK_STATE_KEY[st] || 'linkPending'))),
+    h('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
+      attempt && attempt.sessionId ? h('button', { className: 'dsh-prc-mini', onClick: () => controller.openSession(attempt.sessionId) }, t('openSession')) : null,
+      attempt && attempt.outputTail ? h('button', { className: 'dsh-prc-mini', onClick: () => setOpen(!open) }, (open ? '▾ ' : '▸ ') + t('outputLabel')) : null,
+      !active && attempt ? h('button', { className: 'dsh-prc-mini', onClick: () => void controller.runAction('retry-link', { id: run.id, linkId: link.id }) }, t('retryLink')) : null,
+      !active && st !== 'pending' ? h('button', { className: 'dsh-prc-mini', onClick: () => void controller.runAction('skip-link', { id: run.id, linkId: link.id }) }, t('skipLink')) : null),
+    open && attempt && attempt.outputTail ? h('pre', { className: 'dsh-prc-pre dsh-prc-tail' }, attempt.outputTail) : null)
+}
+
+function RunBoard({ state, controller, t }) {
+  const run = state.run
+  if (state.runLoading) return h('div', { className: 'dsh-prc-board' }, t('loading'))
+  if (!run) return h('div', { className: 'dsh-prc-empty' }, t('emptyRun'))
+  const latest = latestAttempts(run)
+  const phases = Array.isArray(run.snapshot && run.snapshot.phases) ? run.snapshot.phases : []
+  const { done, total } = runProgress(run)
+  const active = ['queued', 'running', 'awaiting', 'paused'].includes(run.status)
+  const children = [
+    h('div', { className: 'dsh-prc-runhead' },
+      h('h3', { className: 'dsh-prc-detail-title' }, run.displayName || run.processName),
+      h(StatusPill, { t, status: run.status }),
+      h('span', { className: 'dsh-prc-count' }, t('progress', { done, total })),
+      h('div', { className: 'dsh-prc-actions' },
+        run.status === 'running' || run.status === 'queued' ? h('button', { className: 'dsh-prc-btn', onClick: () => void controller.runAction('pause', { id: run.id }) }, t('pause')) : null,
+        run.status === 'paused' ? h('button', { className: 'dsh-prc-btn', 'data-primary': 'true', onClick: () => void controller.runAction('resume', { id: run.id }) }, t('resume')) : null,
+        active ? h('button', { className: 'dsh-prc-btn', 'data-danger': 'true', onClick: () => void controller.runAction('stop', { id: run.id }) }, t('stopRun')) : null)),
+    h('div', { className: 'dsh-prc-chips' },
+      h('span', { className: 'dsh-prc-chip' }, run.processId),
+      run.error ? h('span', { className: 'dsh-prc-badge', 'data-kind': 'err' }, t('runError') + ': ' + run.error) : null,
+      h('span', { style: { fontSize: 11, opacity: .6 } }, new Date(run.updatedAt).toLocaleString())),
+  ]
+  if (run.pendingBreak) {
+    children.push(h('div', { className: 'dsh-prc-break' },
+      h('span', { style: { fontWeight: 600 } }, '⚠ ' + t('breakTitle')),
+      h('span', { style: { fontSize: 12 } },
+        run.pendingBreak.linkId
+        + (run.pendingBreak.gate && run.pendingBreak.gate.score !== null && run.pendingBreak.gate.score !== undefined
+          ? ' · ' + t('gateLabel') + ' ' + run.pendingBreak.gate.score + ' / ' + (run.pendingBreak.gate.minScore || 0) : '')
+        + ' · ' + (run.pendingBreak.reason || '')),
+      h('div', { className: 'dsh-prc-actions' },
+        h('button', { className: 'dsh-prc-btn', 'data-primary': 'true', onClick: () => void controller.runAction('resolve-break', { id: run.id, decision: 'retry' }) }, t('decisionRetry')),
+        h('button', { className: 'dsh-prc-btn', onClick: () => void controller.runAction('resolve-break', { id: run.id, decision: 'skip' }) }, t('decisionSkip')),
+        h('button', { className: 'dsh-prc-btn', 'data-danger': 'true', onClick: () => void controller.runAction('resolve-break', { id: run.id, decision: 'stop' }) }, t('decisionStop')))))
+  }
+  for (let i = 0; i < phases.length; i++) {
+    const ph = phases[i]
+    const links = Array.isArray(ph.links) ? ph.links : []
+    children.push(h('div', { className: 'dsh-prc-phase', key: ph.id || i },
+      h('div', { className: 'dsh-prc-phase-head' },
+        h('span', { className: 'dsh-prc-link-id' }, ph.id || i + 1),
+        h('span', null, ph.name || ''),
+        h('span', { className: 'dsh-prc-link-meta' }, links.length + ' ' + t('links'))),
+      links.map((ln) => h(LinkCard, { key: ln.id, t, run, phase: ph, link: ln, attempt: latest.get(ln.id), controller }))))
+  }
+  return h('div', { className: 'dsh-prc-board' }, children)
+}
+
+function ExecView({ state, controller, t }) {
+  return h('div', { style: { display: 'contents' } },
+    h(RunList, { state, controller, t }),
+    state.runId && (state.runLoading || state.run) ? h(RunBoard, { state, controller, t })
+      : state.runId ? h('div', { className: 'dsh-prc-empty' }, t('loading')) : h('div', { className: 'dsh-prc-empty' }, t('emptyRun')))
+}
+
+function NewRunDialog({ state, controller, t }) {
+  const dlg = state.dialog
+  const [workspaces, setWorkspaces] = useState(null)
+  const [ws, setWs] = useState('')
+  useEffect(() => {
+    api('/workspaces').then((d) => setWorkspaces(d.workspaces || [])).catch(() => setWorkspaces([]))
+  }, [])
+  const proc = state.processes.find((p) => p.id === dlg.processId)
+  const [busy, setBusy] = useState(false)
+  return h(Modal, { title: t('runCreate') + '：' + (proc ? (proc.display_name || proc.name) : ''), onClose: () => controller.setState({ dialog: null }) },
+    h('div', { className: 'dsh-prc-kv' }, h('b', null, t('name') + ':'), proc ? proc.relPath : '—'),
+    h('label', { className: 'dsh-prc-field' }, t('runWorkspace'),
+      h('select', { value: ws, onChange: (e) => setWs(e.target.value) },
+        workspaces === null ? h('option', { value: '' }, t('loading')) : [
+          h('option', { key: '_', value: '' }, t('workspaceDefault')),
+          workspaces.map((w) => h('option', { key: w.id, value: w.id }, w.title)),
+        ])),
+    h('div', { style: { fontSize: 12, opacity: .7 } }, '每个环节开一个全新会话执行；门禁由评审会话打分，不过按 on_gate_fail 流转，返工不超过 max_rework。'),
+    h('div', { style: { display: 'flex', gap: 8, justifyContent: 'flex-end' } },
+      h('button', { className: 'dsh-prc-btn', onClick: () => controller.setState({ dialog: null }) }, t('cancel')),
+      h('button', { className: 'dsh-prc-btn', 'data-primary': 'true', disabled: busy || !proc, onClick: async () => {
+        setBusy(true)
+        try { await controller.createRun({ processId: dlg.processId, workspaceId: ws || undefined }) } catch (error) { controller.toast(String(error && error.message || error), 'err') } finally { setBusy(false) }
+      } }, t('runCreate'))))
 }
 
 // ── 设置页 section（M3） ─────────────────────────────────────────────────

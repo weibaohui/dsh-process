@@ -19,7 +19,10 @@ const fsP = require('node:fs/promises')
 const { join, resolve } = require('node:path')
 const { homedir } = require('node:os')
 const { createShareRunJob } = require('@weibaohui/dsh-plugin-kit')
-const { ProcessStore, collectDirNames } = require('./store.js')
+const { ProcessStore, StoreError, collectDirNames } = require('./store.js')
+const { RunStore } = require('./runs.js')
+const { ExecutionService } = require('./execution.js')
+const { parseProcessYaml, validateProcess } = require('./validate.js')
 const { registerRoutes } = require('./routes.js')
 const { registerTools } = require('./tools.js')
 const { SECTION_NAME, SECTION_ORDER, PROCESS_PROTOCOL } = require('./prompt.js')
@@ -66,7 +69,7 @@ module.exports = {
   name: 'dsh-process',
   // 静态注入（系列惯例）：apply 在这些服务就绪后才运行。动态 ctx.inject(['settings'])
   // 在 apply 内不触发（hermes-loop 记录的平台坑），所以全部静态声明。
-  inject: ['webServer', 'tools', 'systemPrompt', 'settings', 'agents', 'agentDefaultModel', 'sessions'],
+  inject: ['webServer', 'tools', 'systemPrompt', 'settings', 'agents', 'agentDefaultModel', 'sessions', 'workspaceRegistry'],
   __test: { defaultSettings, sanitizeSettings, expandHome },
 
   apply(ctx, rawConfig) {
@@ -134,6 +137,32 @@ module.exports = {
     ctx.effect(() => () => store.dispose(), 'dsh-process: store')
     void fileLoaded.then(() => { store.startWatch(); return store.load() })
 
+    // ── 运行台账 + 执行驱动（v0.2）──
+    const runs = new RunStore(join(dshHome(), 'dsh-process', 'runs.json'), logger)
+    const execution = new ExecutionService({ ctx, runs, settings, logger })
+    ctx.effect(() => () => { /* runs 的 persist 定时器 unref，无需显式清理 */ }, 'dsh-process: runs')
+    void runs.load().then(() => execution.tick())
+    const createRun = async ({ processId, workspaceId, model, provider }) => {
+      if (runs.byStatus('queued', 'running').length >= 20) throw new StoreError('invalid_input', '排队/运行中的运行过多（上限 20）')
+      const item = await store.get(processId)
+      const parsed = parseProcessYaml(item.yaml)
+      const result = validateProcess(parsed)
+      if (result.errors.length > 0) {
+        throw new StoreError('invalid', '工艺有校验错误，不能发起运行', { diagnostics: { errors: result.errors, warnings: result.warnings } })
+      }
+      const snapshot = parsed.data
+      const { map } = require('./runs.js').indexLinks(snapshot)
+      if (map.size === 0) throw new StoreError('invalid', '工艺没有任何环节，无法运行')
+      const run = runs.create({
+        processId, workspaceId, model, provider,
+        processName: result.meta.name || item.meta.name,
+        displayName: result.meta.display_name || result.meta.name || item.meta.name,
+        snapshotYaml: item.yaml, snapshot,
+      })
+      execution.tick()
+      return run
+    }
+
     // ── AI 生成（kit 宿主执行器：同进程 agents 会话，输出流式可见）──
     const jobs = new Map()
     const runAi = (prompt) => {
@@ -146,7 +175,7 @@ module.exports = {
     }
 
     // ── 路由 ──
-    ctx.effect(() => registerRoutes(ctx, { store, settings, jobs, runAi, logger }), 'dsh-process: routes')
+    ctx.effect(() => registerRoutes(ctx, { store, settings, jobs, runAi, runs, execution, createRun, logger }), 'dsh-process: routes')
 
     // ── 工具 / 提示词 ──
     ctx.effect(() => {

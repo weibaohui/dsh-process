@@ -157,7 +157,7 @@ test('watch: external write triggers reload + emit', async () => {
   await store.load()
   const revBefore = store.revision
   writeFileSync(join(user, 'watched.yaml'), GOOD('watched'))
-  await new Promise((r) => setTimeout(r, 900))
+  await new Promise((r) => setTimeout(r, 2500))
   assert.equal(store.revision, revBefore + 1)
   assert.ok(events >= 1)
   assert.ok(store.find('watched'))

@@ -19,6 +19,7 @@
  */
 
 const { StoreError, safeName } = require('./store.js')
+const { runSummary } = require('./runs.js')
 const { skeletonYaml } = require('./validate.js')
 const { buildZip } = require('./zip.js')
 const { randomUUID } = require('node:crypto')
@@ -69,14 +70,16 @@ function contentDisposition(filename) {
  * @returns disposer
  */
 function registerRoutes(ctx, deps) {
-  const { store, settings, jobs, logger } = deps
+  const { store, settings, jobs, runs, logger } = deps
   const clients = new Set()
 
   const broadcast = (event, data) => {
     const frame = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
     for (const res of clients) { try { res.write(frame) } catch { clients.delete(res) } }
   }
-  const unsubscribe = store.subscribe((revision) => broadcast('change', { revision }))
+  const sendChange = () => broadcast('change', { revision: store.revision, runsRevision: runs.revision })
+  const unsubscribe = store.subscribe(sendChange)
+  const unsubscribeRuns = runs.subscribe(sendChange)
   const heartbeat = setInterval(() => {
     for (const res of clients) { try { res.write(': ping\n\n') } catch { clients.delete(res) } }
   }, SSE_HEARTBEAT_MS)
@@ -158,6 +161,39 @@ function registerRoutes(ctx, deps) {
         await store.rerootAndReload()
         return sendJson(res, 200, { settings: next, effectiveRoots: store.roots() })
       }
+      if (sub === '/workspaces' && method === 'GET') {
+        const registry = ctx.workspaceRegistry
+        const workspaces = registry && typeof registry.list === 'function'
+          ? registry.list().map((w) => ({ id: w.id, title: w.title || w.path }))
+          : []
+        return sendJson(res, 200, { workspaces })
+      }
+      if (sub === '/runs' && method === 'GET') {
+        return sendJson(res, 200, { revision: runs.revision, runs: runs.list().map(runSummary) })
+      }
+      if (sub === '/run' && method === 'GET') {
+        const run = runs.detail(url.searchParams.get('id') || '')
+        if (!run) throw new StoreError('not_found', '运行不存在')
+        return sendJson(res, 200, { run })
+      }
+      if (sub === '/run-create' && method === 'POST') {
+        const body = await readJsonBody(req)
+        return sendJson(res, 200, { run: runSummary(await deps.createRun(body)) })
+      }
+      if (sub === '/run-action' && method === 'POST') {
+        const body = await readJsonBody(req)
+        const actions = {
+          pause: () => deps.execution.actionPause(body.id),
+          resume: () => deps.execution.actionResume(body.id),
+          stop: () => deps.execution.actionStop(body.id),
+          'resolve-break': () => deps.execution.actionResolveBreak(body.id, body.decision),
+          'skip-link': () => deps.execution.actionSkipLink(body.id, body.linkId),
+          'retry-link': () => deps.execution.actionRetryLink(body.id, body.linkId),
+        }
+        const fn = actions[body.action]
+        if (!fn) throw new StoreError('invalid_input', '未知动作 "' + body.action + '"')
+        return sendJson(res, 200, { run: runSummary(fn()) })
+      }
       if (sub === '/ai-generate' && method === 'POST') {
         if (typeof deps.runAi !== 'function') throw new StoreError('unavailable', '当前组合缺少 agents 服务，无法 AI 生成')
         const body = await readJsonBody(req)
@@ -180,6 +216,7 @@ function registerRoutes(ctx, deps) {
   const disposeRoute = ctx.webServer.register({ kind: 'prefix', path: PREFIX, handler })
   return () => {
     unsubscribe()
+    unsubscribeRuns()
     clearInterval(heartbeat)
     for (const res of clients) { try { res.end() } catch {} }
     clients.clear()
