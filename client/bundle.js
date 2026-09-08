@@ -1181,7 +1181,7 @@ window.__ModuleLoader__.load({
         h('span', { style: { opacity: .5, marginLeft: 'auto', flex: 'none' } }, d.code))))
     }
 
-    function LinkCard({ t, ln, phaseId }) {
+    function StructureLinkCard({ t, ln, phaseId }) {
       const [open, setOpen] = useState(false)
       const meta = []
       if (ln.executor) meta.push(ln.executor)
@@ -1222,7 +1222,7 @@ window.__ModuleLoader__.load({
           h('span', { className: 'dsh-prc-link-meta' }, (Array.isArray(ph.links) ? ph.links.length : 0) + ' ' + t('links'))),
         ph.spec ? h('div', { className: 'dsh-prc-phase-spec' }, ph.spec) : null,
         ph.acceptance_criteria ? h('div', { className: 'dsh-prc-kv' }, h('b', null, t('acceptance') + ':'), h('span', { style: { whiteSpace: 'pre-wrap' } }, ph.acceptance_criteria)) : null,
-        (Array.isArray(ph.links) ? ph.links : []).map((ln, j) => h(LinkCard, { key: ln.id || j, t, ln, phaseId: ph.id })))))
+        (Array.isArray(ph.links) ? ph.links : []).map((ln, j) => h(StructureLinkCard, { key: ln.id || j, t, ln, phaseId: ph.id })))))
     }
 
     function YamlView({ yaml, highlightLine }) {
@@ -1698,7 +1698,7 @@ window.__ModuleLoader__.load({
             h('span', null, new Date(r.updatedAt).toLocaleTimeString())))))
     }
 
-    function LinkCard({ t, run, phase, link, attempt, controller }) {
+    function RunLinkCard({ t, run, phase, link, attempt, controller }) {
       const [open, setOpen] = useState(false)
       const st = attempt ? attempt.status : 'pending'
       const isCurrent = run.current && run.current.linkId === link.id && ['running', 'queued', 'awaiting'].includes(run.status)
@@ -1768,7 +1768,7 @@ window.__ModuleLoader__.load({
             h('span', { className: 'dsh-prc-link-id' }, ph.id || i + 1),
             h('span', null, ph.name || ''),
             h('span', { className: 'dsh-prc-link-meta' }, links.length + ' ' + t('links'))),
-          links.map((ln) => h(LinkCard, { key: ln.id, t, run, phase: ph, link: ln, attempt: latest.get(ln.id), controller }))))
+          links.map((ln) => h(RunLinkCard, { key: ln.id, t, run, phase: ph, link: ln, attempt: latest.get(ln.id), controller }))))
       }
       return h('div', { className: 'dsh-prc-board' }, children)
     }
