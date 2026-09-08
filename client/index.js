@@ -101,6 +101,11 @@ const ZH = {
   breakTitle: '门禁未过，等待你的裁决', decisionRetry: '重试本环节', decisionSkip: '跳过本环节', decisionStop: '中止运行',
   linkPending: '待跑', linkDone: '完成', linkRunning: '进行中', linkGateFailed: '门禁未过', linkSkipped: '跳过', linkFailed: '失败', linkAbandoned: '中断',
   currentStep: '当前', runError: '运行异常',
+  tabFlow: '流程图',
+  flowGate: '门禁 ≥{min}', flowRework: '返工≤{n}', flowNoGate: '无门禁',
+  flowLegendForward: '正常流转', flowLegendJump: '跳转', flowLegendFail: '门禁未过回跳', flowLegendBreak: '中止（不连线）',
+  flowRunCurrent: '当前环节', flowRunDone: '已完成', flowRunGateFailed: '门禁未过', flowRunSkipped: '跳过', flowRunFailed: '失败',
+  flowNoParsed: '工艺无法解析，无法绘制流程图',
 }
 
 const EN = {
@@ -165,6 +170,11 @@ const EN = {
   breakTitle: 'Gate failed — awaiting your decision', decisionRetry: 'Retry this link', decisionSkip: 'Skip this link', decisionStop: 'Stop run',
   linkPending: 'pending', linkDone: 'done', linkRunning: 'running', linkGateFailed: 'gate failed', linkSkipped: 'skipped', linkFailed: 'failed', linkAbandoned: 'abandoned',
   currentStep: 'current', runError: 'run error',
+  tabFlow: 'Flow',
+  flowGate: 'gate ≥{min}', flowRework: 'rework≤{n}', flowNoGate: 'no gate',
+  flowLegendForward: 'forward', flowLegendJump: 'jump', flowLegendFail: 'gate-fail back', flowLegendBreak: 'break (no edge)',
+  flowRunCurrent: 'current', flowRunDone: 'done', flowRunGateFailed: 'gate failed', flowRunSkipped: 'skipped', flowRunFailed: 'failed',
+  flowNoParsed: 'Process cannot be parsed — cannot draw flow',
 }
 
 function makeT(bound) {
@@ -315,6 +325,12 @@ const STYLE = `
 .dsh-prc-mini { border:1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.3)); background:transparent; color:inherit; border-radius:6px; padding:2px 7px; font:inherit; font-size:11px; cursor:pointer; white-space:nowrap; }
 .dsh-prc-mini:hover { background:var(--dsw-hover, rgba(128,128,128,.12)); }
 .dsh-prc-tail { max-height:180px; overflow:auto; margin:0; }
+.dsh-prc-flowwrap { border:1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.3)); border-radius:10px; background:var(--dsw-alias-bg-layer-2, rgba(128,128,128,.05)); overflow:auto; max-height:460px; }
+.dsh-prc-flowlegend { display:flex; gap:14px; flex-wrap:wrap; font-size:11px; color:var(--dsw-text-secondary, gray); margin:6px 2px 10px; align-items:center; }
+.dsh-prc-flowlegend .sw { display:inline-block; width:18px; height:0; border-top:2px solid; margin-right:4px; vertical-align:middle; }
+.dsh-prc-flowlegend .sw.fwd { border-color:var(--dsw-text-secondary, #94a3b8); }
+.dsh-prc-flowlegend .sw.jump { border-color:#22c55e; }
+.dsh-prc-flowlegend .sw.fail { border-color:var(--dsw-alias-state-error, #ef4444); border-top-style:dashed; }
 `
 
 let stylesInjected = false
@@ -1113,10 +1129,11 @@ function DetailPane({ state, controller, t }) {
       item.diagnostics && item.diagnostics.warnings.length > 0 ? h('span', { className: 'dsh-prc-badge', 'data-kind': 'warn' }, item.diagnostics.warnings.length + t('warnOne')) : null,
       h('span', { style: { fontSize: 11, opacity: .6 } }, meta.relPath)),
     h('div', { className: 'dsh-prc-tabs' },
-      ['overview', 'structure', 'yaml'].map((tab) => h('button', { key: tab, className: 'dsh-prc-tab', 'data-on': state.tab === tab ? 'true' : undefined, onClick: () => controller.setTab(tab) },
+      ['overview', 'flow', 'structure', 'yaml'].map((tab) => h('button', { key: tab, className: 'dsh-prc-tab', 'data-on': state.tab === tab ? 'true' : undefined, onClick: () => controller.setTab(tab) },
         t('tab' + tab[0].toUpperCase() + tab.slice(1))))),
     state.tab === 'overview' ? h(OverviewTab, { t, meta, parsed: item.parsed, diagnostics: item.diagnostics, onJump: jump })
-      : state.tab === 'structure' ? h(StructureTab, { t, parsed: item.parsed })
+      : state.tab === 'flow' ? h(FlowGraph, { t, parsed: item.parsed })
+        : state.tab === 'structure' ? h(StructureTab, { t, parsed: item.parsed })
         : h(YamlView, { yaml: item.yaml, highlightLine: state.highlightLine }))
 }
 
@@ -1566,6 +1583,7 @@ function RunBoard({ state, controller, t }) {
       run.error ? h('span', { className: 'dsh-prc-badge', 'data-kind': 'err' }, t('runError') + ': ' + run.error) : null,
       h('span', { style: { fontSize: 11, opacity: .6 } }, new Date(run.updatedAt).toLocaleString())),
   ]
+  children.push(h('div', { className: 'dsh-prc-sec' }, h(FlowGraph, { t, parsed: run.snapshot, run })))
   if (run.pendingBreak) {
     children.push(h('div', { className: 'dsh-prc-break' },
       h('span', { style: { fontWeight: 600 } }, '⚠ ' + t('breakTitle')),
@@ -1625,6 +1643,338 @@ function NewRunDialog({ state, controller, t }) {
       } }, t('runCreate'))))
 }
 
+/**
+ * 流程图可视化（v0.3）：工艺 YAML → 有向图 → 零依赖分层布局 → SVG 渲染。
+ *
+ * 建模对齐 ntd（nothing-todo）ProcessFlowGraph 的视觉语言：
+ * - START → 第一个环节 → … → END；on_success 实线（forward 灰 / goto 跳转绿），
+ *   on_gate_fail 红色虚线 + 「门禁未过 → <id>」标签，break 不连线只在节点上标注，
+ *   回边（指向更早环节）从节点上沿绕行，自环画右侧小环。
+ * - 节点卡：序号徽标、环节名、executor/expert、门禁徽标（最低分数线）、返工上限。
+ * - 运行态叠加：attempt 状态映射节点描边/徽标（当前橙、完成绿+实际门禁得分、
+ *   门禁未过红、跳过灰虚、中断深灰）。
+ *
+ * 布局是纯函数（rank 用 forward 边最长路径，层内按声明序），可在 plain Node 下单测。
+ */
+
+
+const START_ID = '__start'
+const END_ID = '__end'
+
+/** 解析流转值（host validate.flowTarget 的客户端镜像）：'next'|'end'|'break'|{jump}。 */
+function clientFlowTarget(value) {
+  if (value === undefined || value === null || value === '') return null
+  const v = String(value).trim()
+  if (v === 'next' || v === 'end' || v === 'break') return v
+  if (v.startsWith('goto:')) return { jump: v.slice(5).trim() }
+  return { jump: v }
+}
+
+/**
+ * 解析后的工艺对象 → 流程图模型。
+ * @returns {{ nodes: Array, edges: Array, breaks: Array, warnings: string[] } | null}
+ *  nodes: { id, no, name, phaseId, phaseName, executor, expert, gateMin, gateCount, maxRework, skills }
+ *  edges: { from, to, kind: 'forward'|'jump'|'fail', label }
+ *  breaks: { linkId, field, value }（break 不连线，节点上标注）
+ */
+function buildFlowModel(parsed) {
+  if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.phases)) return null
+  const nodes = []
+  const byId = new Map()
+  for (const ph of parsed.phases) {
+    if (!ph || typeof ph !== 'object') continue
+    const links = Array.isArray(ph.links) ? ph.links : []
+    for (const ln of links) {
+      if (!ln || typeof ln !== 'object' || !ln.id) continue
+      const gates = Array.isArray(ln.gates) ? ln.gates.filter((g) => g && typeof g === 'object') : []
+      const gateMin = gates.reduce((min, g) => (typeof g.min_score === 'number' ? Math.min(min, g.min_score) : min), Infinity)
+      const node = {
+        id: String(ln.id),
+        no: nodes.length + 1,
+        name: ln.name || ln.id,
+        phaseId: ph.id || '',
+        phaseName: ph.name || ph.id || '',
+        executor: ln.executor || null,
+        expert: (ln.expert_name || ln.expert) || null,
+        gateCount: gates.length,
+        gateMin: Number.isFinite(gateMin) ? gateMin : null,
+        maxRework: Number.isInteger(ln.max_rework) ? ln.max_rework : null,
+        skills: Array.isArray(ln.skills) ? ln.skills : [],
+        onSuccess: ln.on_success || 'next',
+        onGateFail: ln.on_gate_fail == null ? null : String(ln.on_gate_fail),
+      }
+      nodes.push(node)
+      byId.set(node.id, node)
+    }
+  }
+  if (nodes.length === 0) return null
+
+  const edges = []
+  const breaks = []
+  const warnings = []
+  if (nodes.length > 0) edges.push({ from: START_ID, to: nodes[0].id, kind: 'forward', label: '' })
+  const resolve = (value, fromNode) => {
+    const t = clientFlowTarget(value)
+    if (t === null) return null
+    if (t === 'next' || t === 'end' || t === 'break') return t
+    return byId.has(t.jump) ? t.jump : null
+  }
+  nodes.forEach((node, i) => {
+    // on_success
+    const ok = resolve(node.onSuccess)
+    if (ok === 'next') {
+      const nextNode = nodes[i + 1]
+      if (nextNode) edges.push({ from: node.id, to: nextNode.id, kind: 'forward', label: '' })
+      else edges.push({ from: node.id, to: END_ID, kind: 'forward', label: '' })
+    } else if (ok === 'end') {
+      edges.push({ from: node.id, to: END_ID, kind: 'forward', label: '' })
+    } else if (typeof ok === 'string') {
+      edges.push({ from: node.id, to: ok, kind: 'jump', label: node.onSuccess })
+    } else {
+      warnings.push(`环节 "${node.id}" 的 on_success 无法解析`)
+    }
+    // on_gate_fail（与成功策略不同才画；显式 break 才记标注，缺省不标）
+    const gf = node.onGateFail == null ? null : resolve(node.onGateFail)
+    if (node.onGateFail === 'break') {
+      breaks.push({ linkId: node.id, field: 'on_gate_fail', value: 'break' })
+    } else if (typeof gf === 'string' && gf !== ok) {
+      edges.push({ from: node.id, to: gf, kind: 'fail', label: `门禁未过 → ${gf}` })
+    }
+  })
+  return { nodes, edges, breaks, warnings }
+}
+
+// ── 布局（纯函数）────────────────────────────────────────────────────────
+
+const FLOW_NODE_W = 196
+const FLOW_NODE_H = 74
+const FLOW_GAP_X = 64
+const FLOW_GAP_Y = 28
+const FLOW_PAD = 26
+const LOOP_BACK_PAD = 34
+
+/**
+ * 分层布局：START=rank0；沿 forward/jump 前向边做最长路径分层；回边(to.rank≤from.rank)
+ * 不参与分层、渲染为顶部绕行弧线。层内按声明序排布。
+ * @returns {{ positions: Map, width: number, height: number, backEdges: Set<string>, loops: Set<string> }}
+ *  positions: id → {x, y}（节点左上角；含 START/END 虚拟节点）
+ */
+function layoutFlowGraph(model) {
+  const { nodes, edges } = model
+  const positions = new Map()
+  const backEdges = new Set()
+  const loops = new Set()
+  if (nodes.length === 0) return { positions, width: 200, height: 120, backEdges, loops }
+
+  const ids = [START_ID, ...nodes.map((n) => n.id), END_ID]
+  const out = new Map(ids.map((id) => [id, []]))
+  const forward = []   // 参与分层的边
+  for (const e of edges) {
+    const key = e.from + '→' + e.to
+    if (e.from === e.to) { loops.add(key); continue }
+    if (e.kind !== 'fail' && e.to !== START_ID && e.from !== END_ID) {
+      forward.push(e)
+    } else backEdges.add(key)
+  }
+
+  // rank：forward 边最长路径（迭代松弛，有环时靠上限收敛）
+  const rank = new Map(ids.map((id) => [id, id === START_ID ? 0 : 1]))
+  for (let iter = 0; iter < ids.length + 1; iter++) {
+    let changed = false
+    for (const e of forward) {
+      const r = rank.get(e.from) + 1
+      if (r > (rank.get(e.to) ?? -Infinity) && rank.get(e.to) !== 0 && !(e.to === START_ID)) {
+        if (e.to === END_ID) { if (r > rank.get(END_ID)) { rank.set(END_ID, r); changed = true } }
+        else if (r <= nodes.length + 1) { rank.set(e.to, r); changed = true }
+      }
+    }
+    if (!changed) break
+  }
+  // 收紧：无入边的非 START 节点贴着最小可用 rank（减小空洞）
+  for (const id of ids) {
+    if (id === START_ID) continue
+    const incoming = forward.filter((e) => e.to === id)
+    if (incoming.length === 0 && rank.get(id) > 1) rank.set(id, 1)
+  }
+
+  // 层内排序：同 rank 按声明序
+  const decl = new Map(nodes.map((n, i) => [n.id, i]))
+  const byRank = new Map()
+  for (const id of ids) {
+    const r = rank.get(id)
+    if (!byRank.has(r)) byRank.set(r, [])
+    byRank.get(r).push(id)
+  }
+  for (const list of byRank.values()) {
+    list.sort((a, b) => (decl.get(a) ?? -1) - (decl.get(b) ?? -1) || a.localeCompare(b))
+  }
+  const maxRank = Math.max(...[...byRank.keys()])
+  for (const [r, list] of byRank) {
+    list.forEach((id, i) => positions.set(id, {
+      x: FLOW_PAD + r * (FLOW_NODE_W + FLOW_GAP_X),
+      y: FLOW_PAD + LOOP_BACK_PAD + i * (FLOW_NODE_H + FLOW_GAP_Y),
+    }))
+  }
+  // END 挂在最右
+  if (!positions.has(END_ID)) {
+    const maxR = maxRank
+    positions.set(END_ID, { x: FLOW_PAD + (maxR + 1) * (FLOW_NODE_W + FLOW_GAP_X), y: FLOW_PAD + LOOP_BACK_PAD })
+  }
+  const width = FLOW_PAD * 2 + (maxRank + 2) * (FLOW_NODE_W + FLOW_GAP_X)
+  const maxPerLayer = Math.max(1, ...[...byRank.values()].map((l) => l.length))
+  const height = FLOW_PAD * 2 + LOOP_BACK_PAD + maxPerLayer * (FLOW_NODE_H + FLOW_GAP_Y)
+  return { positions, width, height, backEdges, loops }
+}
+
+
+// ── 流程图 SVG 组件（v0.3）──────────────────────────────────────────────
+
+function flowPhaseColor(phaseId) {
+  let h = 0
+  for (let i = 0; i < String(phaseId || '').length; i++) h = (h * 31 + String(phaseId).charCodeAt(i)) >>> 0
+  return 'hsl(' + (h % 360) + ' 45% 55%)'
+}
+
+function escXml(text) {
+  return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+/**
+ * 流程图 SVG。model/layout 来自 flow-model；runState 可选（运行态高亮）：
+ * { latestByLink: Map<linkId, attempt>, currentLinkId, pendingLinkId }
+ */
+function FlowGraph({ t, parsed, run }) {
+  const [zoom, setZoom] = useState(1)
+  const wrapRef = useRef(null)
+  const fittedRef = useRef(false)
+  const model = useMemo(() => buildFlowModel(parsed), [parsed])
+  const layout = useMemo(() => (model ? layoutFlowGraph(model) : null), [model])
+  // 首屏自适应：整图铺满容器宽度（最多放大到 100%），之后用户手动缩放不被覆盖
+  useEffect(() => {
+    if (!layout || fittedRef.current || !wrapRef.current) return
+    fittedRef.current = true
+    const avail = wrapRef.current.clientWidth - 4
+    if (layout.width > avail && avail > 100) setZoom(Math.max(0.3, avail / layout.width))
+  }, [layout])
+  const latest = useMemo(() => (run ? latestAttempts(run) : null), [run])
+  if (!model || !layout) return h('div', { className: 'dsh-prc-empty' }, t('flowNoParsed'))
+
+  const pos = layout.positions
+  const nodeById = new Map([[START_ID, { id: START_ID, name: 'START', phaseName: '' }], [END_ID, { id: END_ID, name: 'END', phaseName: '' }], ...model.nodes.map((n) => [n.id, n])])
+  const currentLinkId = run && run.current && run.current.linkId
+  const stateOf = (linkId) => {
+    if (!run) return null
+    if (run.pendingBreak && run.pendingBreak.linkId === linkId) return 'awaiting'
+    if (currentLinkId === linkId && ['running', 'queued', 'awaiting'].includes(run.status)) return 'current'
+    const a = latest && latest.get(linkId)
+    return a ? a.status : null
+  }
+  const STROKE = { forward: 'var(--dsw-text-secondary, #94a3b8)', jump: '#22c55e', fail: 'var(--dsw-alias-state-error, #ef4444)' }
+  const edgePath = (e) => {
+    const from = pos.get(e.from)
+    const to = pos.get(e.to)
+    if (!from || !to) return null
+    const isBack = layout.backEdges.has(e.from + '→' + e.to)
+    const isLoop = layout.loops.has(e.from + '→' + e.to)
+    if (e.from === START_ID) return { d: 'M' + (from.x + FLOW_NODE_W / 2) + ' ' + (from.y + 14) + ' L' + (to.x) + ' ' + (to.y + FLOW_NODE_H / 2), label: null }
+    if (e.to === END_ID) return { d: 'M' + (from.x + FLOW_NODE_W) + ' ' + (from.y + FLOW_NODE_H / 2) + ' L' + (to.x) + ' ' + (to.y + 16), label: null }
+    if (isLoop) {
+      const sx = from.x + FLOW_NODE_W, sy = from.y + 18
+      return { d: 'M' + sx + ' ' + sy + ' C' + (sx + 46) + ' ' + sy + ' ' + (sx + 46) + ' ' + (sy + 30) + ' ' + sx + ' ' + (sy + 34), label: null }
+    }
+    if (isBack) {
+      const sx = from.x + FLOW_NODE_W / 2, sy = from.y
+      const tx = to.x + FLOW_NODE_W / 2, ty = to.y
+      const lift = Math.min(LOOP_BACK_PAD - 6, 12 + (sy - ty) * 0.18)
+      return { d: 'M' + sx + ' ' + sy + ' C' + sx + ' ' + (sy - lift) + ' ' + tx + ' ' + (ty - lift) + ' ' + tx + ' ' + ty, label: e.kind === 'fail' ? e.label : (e.label || '') }
+    }
+    const sx = from.x + FLOW_NODE_W, sy = from.y + FLOW_NODE_H / 2
+    const tx = to.x, ty = to.y + FLOW_NODE_H / 2
+    const dx = Math.max(28, (tx - sx) / 2)
+    return { d: 'M' + sx + ' ' + sy + ' C' + (sx + dx) + ' ' + sy + ' ' + (tx - dx) + ' ' + ty + ' ' + tx + ' ' + ty, label: e.label || null }
+  }
+
+  const nodeSvg = (id) => {
+    const p = pos.get(id)
+    if (!p) return null
+    if (id === START_ID || id === END_ID) {
+      const isStart = id === START_ID
+      return h('g', { key: id },
+        h('rect', { x: p.x, y: p.y, width: FLOW_NODE_W, height: 30, rx: 15, fill: 'var(--dsw-alias-bg-layer-1, transparent)', stroke: 'var(--dsw-alias-border-l2, rgba(128,128,128,.4))' }),
+        h('text', { x: p.x + FLOW_NODE_W / 2, y: p.y + 20, textAnchor: 'middle', fontSize: 12, fontWeight: 700, fill: 'var(--dsw-text-secondary, gray)', style: { fontFamily: 'monospace', letterSpacing: 2 } }, isStart ? '▶ START' : '■ END'))
+    }
+    const node = nodeById.get(id)
+    const st = stateOf(id)
+    const att = run && latest && latest.get(id)
+    const border = st === 'current' ? '#d9822b'
+      : st === 'done' || st === 'skipped' ? '#2e9e5b'
+        : st === 'gate_failed' || st === 'awaiting' ? 'var(--dsw-alias-state-error, #ef4444)'
+          : st === 'failed' ? 'var(--dsw-alias-state-error, #ef4444)' : 'var(--dsw-alias-border-l2, rgba(128,128,128,.35))'
+    const badge = []
+    if (node.gateCount > 0) badge.push(t('flowGate', { min: node.gateMin === null ? '?' : node.gateMin }))
+    else badge.push(t('flowNoGate'))
+    if (node.maxRework !== null) badge.push(t('flowRework', { n: node.maxRework }))
+    let runBadge = null
+    if (att && att.gate && att.gate.score !== null && att.gate.score !== undefined) {
+      runBadge = att.gate.score + '/' + (att.gate.minScore || 0)
+    }
+    const meta = [node.executor, node.expert].filter(Boolean).join(' · ')
+    const w = FLOW_NODE_W, hgt = FLOW_NODE_H
+    return h('g', { key: id },
+      h('rect', { x: p.x + 3, y: p.y + 6, width: 6, height: hgt - 12, rx: 3, fill: flowPhaseColor(node.phaseId) }),
+      h('rect', { x: p.x, y: p.y, width: w, height: hgt, rx: 10, fill: 'var(--dsw-alias-bg-layer-1, #fff)', stroke: border, strokeWidth: st === 'current' ? 2.5 : 1.2 }),
+      h('rect', { x: p.x - 9, y: p.y - 9, width: 22, height: 18, rx: 9, fill: 'var(--dsw-alias-bg-layer-2, #f1f5f9)', stroke: 'var(--dsw-alias-border-l1, rgba(128,128,128,.2))' }),
+      h('text', { x: p.x + 2, y: p.y + 4, textAnchor: 'middle', fontSize: 10, fontWeight: 700, fill: 'var(--dsw-text-secondary, gray)', style: { fontFamily: 'monospace' } }, String(node.no).padStart(2, '0')),
+      h('text', { x: p.x + 14, y: p.y + 24, fontSize: 13, fontWeight: 600, fill: 'var(--dsw-alias-label-primary, currentColor)' }, escXml(node.name.slice(0, 16))),
+      h('text', { x: p.x + 14, y: p.y + 41, fontSize: 10, fill: 'var(--dsw-text-secondary, gray)' }, escXml((meta || node.phaseName || '').slice(0, 26))),
+      h('text', { x: p.x + 14, y: p.y + hgt - 10, fontSize: 10, fill: node.gateCount > 0 ? '#b8860b' : 'var(--dsw-text-secondary, gray)' }, escXml(badge.join(' · ')).slice(0, 34)),
+      runBadge ? h('rect', { x: p.x + w - 66, y: p.y + hgt + 6, width: 64, height: 18, rx: 9, fill: 'var(--dsw-alias-bg-layer-1, #fff)', stroke: '#2e9e5b' }) : null,
+      runBadge ? h('text', { x: p.x + w - 34, y: p.y + hgt + 19, textAnchor: 'middle', fontSize: 10, fontWeight: 700, fill: '#2e9e5b' }, runBadge) : null,
+      st === 'current' ? h('circle', { cx: p.x + w - 12, cy: p.y + 12, r: 5, fill: '#d9822b' }) : null,
+      st === 'done' ? h('circle', { cx: p.x + w - 12, cy: p.y + 12, r: 5, fill: '#2e9e5b' }) : null,
+      (st === 'gate_failed' || st === 'awaiting' || st === 'failed') ? h('circle', { cx: p.x + w - 12, cy: p.y + 12, r: 5, fill: 'var(--dsw-alias-state-error, #ef4444)' }) : null)
+  }
+
+  const edgeSvgs = []
+  for (const e of model.edges) {
+    const path = edgePath(e)
+    if (!path) continue
+    const color = e.kind === 'fail' ? STROKE.fail : e.kind === 'jump' ? STROKE.jump : STROKE.forward
+    const dashed = e.kind === 'fail' ? '6,4' : undefined
+    edgeSvgs.push(h('path', { key: e.from + '→' + e.to + e.kind, d: path.d, fill: 'none', stroke: color, strokeWidth: e.kind === 'fail' ? 1.8 : 1.4, strokeDasharray: dashed, markerEnd: 'url(#dsh-prc-arrow-' + (e.kind === 'fail' ? 'f' : e.kind === 'jump' ? 'j' : 'n') + ')' }))
+    if (path.label) {
+      const from = pos.get(e.from), to = pos.get(e.to)
+      const mx = (from.x + to.x + FLOW_NODE_W) / 2, my = Math.min(from.y, to.y) - 6
+      edgeSvgs.push(h('text', { key: e.from + '→' + e.to + e.kind + 'lbl', x: mx, y: my, textAnchor: 'middle', fontSize: 10, fill: e.kind === 'fail' ? 'var(--dsw-alias-state-error, #ef4444)' : '#16a34a', fontWeight: 600 }, escXml(path.label).slice(0, 30)))
+    }
+  }
+
+  return h('div', null,
+    h('div', { className: 'dsh-prc-flowlegend' },
+      h('span', null, h('span', { className: 'sw fwd' }), t('flowLegendForward')),
+      h('span', null, h('span', { className: 'sw jump' }), t('flowLegendJump')),
+      h('span', null, h('span', { className: 'sw fail' }), t('flowLegendFail')),
+      h('span', null, t('flowLegendBreak')),
+      h('span', { style: { marginLeft: 'auto' } },
+        h('button', { className: 'dsh-prc-mini', onClick: () => setZoom(Math.max(0.5, zoom - 0.2)) }, '−'),
+        h('span', { style: { margin: '0 6px' } }, Math.round(zoom * 100) + '%'),
+        h('button', { className: 'dsh-prc-mini', onClick: () => setZoom(Math.min(2, zoom + 0.2)) }, '+'))),
+    h('div', { className: 'dsh-prc-flowwrap', ref: wrapRef },
+      h('svg', { width: layout.width * zoom, height: layout.height * zoom, viewBox: '0 0 ' + layout.width + ' ' + layout.height },
+        h('defs', null,
+          h('marker', { id: 'dsh-prc-arrow-n', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, h('path', { d: 'M0 0L10 5L0 10z', fill: 'var(--dsw-text-secondary, #94a3b8)' })),
+          h('marker', { id: 'dsh-prc-arrow-j', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, h('path', { d: 'M0 0L10 5L0 10z', fill: '#22c55e' })),
+          h('marker', { id: 'dsh-prc-arrow-f', viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, h('path', { d: 'M0 0L10 5L0 10z', fill: 'var(--dsw-alias-state-error, #ef4444)' }))),
+        edgeSvgs,
+        [START_ID, ...model.nodes.map((n) => n.id), END_ID].map((id) => nodeSvg(id)))))
+}
+
+function FlowTab({ t, parsed }) {
+  return h('div', null, h(FlowGraph, { t, parsed }))
+}
+
+
+
 // ── 挂载 ─────────────────────────────────────────────────────────────────
 
 const name = CLIENT_NAME
@@ -1675,7 +2025,7 @@ function unmountFallbackPanel() {
 const moduleExports = {
   name,
   inject,
-  __internals: { Controller, filterProcesses, ZH, EN, AI_PROMPT, colorizeLine },
+  __internals: { Controller, filterProcesses, ZH, EN, AI_PROMPT, colorizeLine, buildFlowModel, layoutFlowGraph, clientFlowTarget },
   __boot(container, opts = {}) {
     ensureStyles()
     const t = makeT(null)
