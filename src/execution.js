@@ -17,6 +17,16 @@ const { randomUUID } = require('node:crypto')
 const { makeAttempt, parseFlow, indexLinks, nextLinkAfter, firstLinkId, runSummary } = require('./runs.js')
 
 const OUTPUT_TAIL_CAP = 8 * 1024
+
+/** 会话事件列表：0.1.2-rc.1 起是 session.log（数组），旧版是 session.events。 */
+function sessionEventList(agent) {
+  try {
+    const ses = agent && agent.session
+    if (Array.isArray(ses && ses.log)) return ses.log
+    if (Array.isArray(ses && ses.events)) return ses.events
+  } catch { /* 会话对象缺席 */ }
+  return []
+}
 const PUMP_MS = 500
 const TOUCH_THROTTLE_MS = 1500
 const JUDGE_TIMEOUT_MS = 180000
@@ -220,7 +230,7 @@ class ExecutionService {
     ].filter((x) => x !== '').join('\n')
   }
 
-  async createSession({ run, title }) {
+  async createSession({ run, title, withTools = true }) {
     const selection = run.model
       ? { provider: run.provider, model: run.model }
       : this.ctx.agentDefaultModel.currentSelection()
@@ -232,8 +242,26 @@ class ExecutionService {
     const cwd = workspace ? workspace.path : this.settings.get().userRoot
     const { agent } = await this.ctx.agents.create({
       sessionId,
-      meta: { cwd, agentPreset: 'standard' },
+      meta: { cwd },
       agentOptions: { provider: selection.provider, model: selection.model },
+      // 关键：meta.agentPreset 只是会话头标签、不带任何工具——必须在 setup 里 mount
+      // 部署默认预设（web 网关/dsh-tasks/dsh-kb 同款），否则会话零工具，
+      // 模型只会干说「我无法执行」（真机抓过，见 dsh-kb v0.2 踩坑实录①）。
+      setup: async (agentCtx) => {
+        try {
+          const presets = typeof this.ctx.get === 'function' ? this.ctx.get('agentPresets') : undefined
+          if (withTools && presets && typeof presets.resolve === 'function' && typeof presets.mount === 'function') {
+            const resolved = await presets.resolve(undefined)
+            if (resolved && resolved.id) await presets.mount(agentCtx, resolved.id)
+            this.logger.info && this.logger.info(`[dsh-process] preset mounted: ${resolved && resolved.id}`)
+          }
+          if (withTools) {
+            // 无人值守要写产物文件：沙箱 workspace-write + 审批 never（dsh-kb 同款旋钮）
+            agentCtx.session.append('sandbox/mode', { mode: 'workspace-write' })
+            agentCtx.session.append('approval/policy', { policy: 'never' })
+          }
+        } catch (e) { console.error(`[dsh-process] setup 失败（会话将继续但可能无工具）: ${e && e.stack || e}`) }
+      },
     })
     if (workspace && typeof workspace.attachSession === 'function') {
       try { await workspace.attachSession(sessionId) } catch { /* 附加失败不影响执行 */ }
@@ -241,6 +269,8 @@ class ExecutionService {
     try {
       agent.session.append('session/title', { title, messageSeqs: [], source: { kind: 'user' } })
     } catch { /* 标题失败非致命 */ }
+    // 等会话运行时启动完成（kit 同款）：立刻 followup 会丢消息（会话零事件、空转完成）
+    await agent.whenIdle()
     return { agent, sessionId }
   }
 
@@ -259,7 +289,7 @@ class ExecutionService {
     const firstSeq = agent.session.seq
     const seen = new Set()
     const liveLine = (text) => { tail = (tail + text).slice(-OUTPUT_TAIL_CAP) }
-    const eventList = () => { try { return Array.isArray(agent.session.events) ? agent.session.events : [] } catch { return [] } }
+    const eventList = () => sessionEventList(agent)
     const pump = () => {
       let changed = false
       for (const ev of eventList()) {
@@ -294,6 +324,7 @@ class ExecutionService {
       }
     }
     try { if (this.ctx.sessions && typeof this.ctx.sessions.flush === 'function') await this.ctx.sessions.flush(agent.session) } catch { /* 刷盘失败不致命 */ }
+
     attempt.outputTail = output.slice(-OUTPUT_TAIL_CAP)
     return output
   }
@@ -310,9 +341,10 @@ class ExecutionService {
       `【执行报告】\n${output || '(无输出)'}`,
     ].join('\n')
     try {
-      const { agent } = await this.createSession({ run, title: `门禁评审 · ${gate.name || gate.type}` })
+      const { agent } = await this.createSession({ run, title: `门禁评审 · ${gate.name || gate.type}`, withTools: false })
+      await agent.whenIdle()
       const firstSeq = agent.session.seq
-      const eventList = () => { try { return Array.isArray(agent.session.events) ? agent.session.events : [] } catch { return [] } }
+      const eventList = () => sessionEventList(agent)
       agent.followup({ content: [{ type: 'text', text: prompt }], source: { kind: 'plugin', plugin: 'dsh-process' } })
       const idle = agent.whenIdle()
       const timer = new Promise((resolve) => setTimeout(() => resolve('timeout'), JUDGE_TIMEOUT_MS))
