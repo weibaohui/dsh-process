@@ -87,6 +87,10 @@ const ZH = {
   copyPrompt: '复制 Prompt', aiOutput: '输出', aiFailed: '失败', aiRequirementPh: '例如：把口头需求整理成 PRD 并拆解成开发任务',
   kitMissing: 'dsh-plugin-kit 未内联（构建问题）', nameRule: '名称不能为空、不能含 / 或 \\、不能以点开头',
   sessionUnavailable: '当前页面拿不到会话服务，无法跳转',
+  atAgent: '给 agent', atAgentTitle: '@ 进对话框，让 agent 帮你修改这个工艺（输入你的修改要求后发送）',
+  atAgentBundledTitle: '@ 进对话框（内置只读，agent 会改完存成你的新工艺）',
+  atAgentBundledHint: '（这是内置只读工艺——请改完用 process_save 存成我的库里的新工艺）',
+  atInserted: '已 @ 进对话框：输入你的修改要求后发送', atCopied: '没找到输入框，已复制引用到剪贴板',
   viewLib: '工艺库', viewExec: '执行',
   runCreate: '▶ 按工艺执行', runWorkspace: '工作区（可选）', runStarted: '运行已发起',
   workspaceDefault: '默认（不绑定）',
@@ -157,6 +161,10 @@ const EN = {
   copyPrompt: 'Copy prompt', aiOutput: 'Output', aiFailed: 'Failed', aiRequirementPh: 'e.g. turn a verbal requirement into a PRD and split it into dev tasks',
   kitMissing: 'dsh-plugin-kit not inlined (build issue)', nameRule: 'Name must be non-empty, without / or \\, and not start with a dot',
   sessionUnavailable: 'Session service unavailable on this page',
+  atAgent: 'Ask agent', atAgentTitle: '@-reference into the composer and let an agent modify this process',
+  atAgentBundledTitle: '@-reference (bundled is read-only; the agent will save a new process into your library)',
+  atAgentBundledHint: '(this is a read-only bundled process — save your edited version as a new process in MY library via process_save)',
+  atInserted: '@-referenced in the composer: type your change request and send', atCopied: 'Composer not found — reference copied to clipboard',
   viewLib: 'Library', viewExec: 'Runs',
   runCreate: '▶ Run process', runWorkspace: 'Workspace (optional)', runStarted: 'Run started',
   workspaceDefault: 'Default (unbound)',
@@ -666,6 +674,22 @@ class Controller {
   aiRun(prompt) { return api('/ai-generate', { method: 'POST', body: { prompt } }).then((d) => d.jobId) }
   aiPoll(jobId) { return api('/jobs?id=' + encodeURIComponent(jobId)) }
 
+  /**
+   * @ 给 agent：把工艺文件以 @绝对路径 引用进当前会话的 composer（file-share 同款
+   * 双形态写入 + 剪贴板兜底），用户接着输入修改要求发送即可——agent 会用
+   * process_get/process_validate/process_save 工具完成修改。
+   */
+  atAgent(meta) {
+    const root = meta.source === 'user' ? this.state.roots.user : this.state.roots.bundled
+    const abs = (root || '').replace(/\/+$/, '') + '/' + meta.relPath
+    const hint = meta.source === 'bundled' ? this.tr('atAgentBundledHint') : ''
+    const text = '@' + abs + ' ' + hint
+    const result = insertComposerText(text)
+    this.closePanel()
+    if (result === 'ok') this.toast(this.tr('atInserted'))
+    else this.toast(this.tr('atCopied'), 'err')
+  }
+
   // ── 执行视图（v0.2）──
   setView(view) { this.setState({ view }); this.persist() }
   selectRun(id) {
@@ -700,6 +724,34 @@ class Controller {
 }
 
 // ── 侧栏入口行（DOM 注入，taskboard 家族同款） ─────────────────────────────
+
+/** 把文本写进当前会话的 composer（file-share 同款双形态 + 剪贴板兜底）。
+ *  返回 'ok'（已写入输入框）或 'copied'（退化为剪贴板）。 */
+function insertComposerText(text) {
+  try {
+    const card = document.querySelector('[data-composer-card]')
+    const ta = card && card.querySelector('textarea')
+    const ce = card && (card.querySelector('[contenteditable="true"]') || card.querySelector('[contenteditable=""]'))
+    if (typeof document.execCommand === 'function' && (ta || ce)) {
+      if (ta) {
+        ta.focus()
+        const len = ta.value ? ta.value.length : 0
+        try { ta.setSelectionRange(len, len) } catch {}
+      } else if (ce) {
+        ce.focus()
+        const sel = window.getSelection()
+        const range = document.createRange()
+        range.selectNodeContents(ce)
+        range.collapse(false)
+        sel.removeAllRanges()
+        sel.addRange(range)
+      }
+      if (document.execCommand('insertText', false, text)) return 'ok'
+    }
+  } catch {}
+  try { navigator.clipboard.writeText(text) } catch {}
+  return 'copied'
+}
 
 const ICON = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="1.5" width="5" height="4.5" rx="1"/><rect x="9.5" y="10" width="5" height="4.5" rx="1"/><path d="M4 6v3.5A1.5 1.5 0 0 0 5.5 11h4"/></svg>'
 
@@ -1101,6 +1153,7 @@ function DetailPane({ state, controller, t }) {
   const copyYaml = () => {
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(item.yaml).then(() => controller.toast(t('copied'))).catch(() => {})
   }
+  const atAgent = () => controller.atAgent(meta)
   if (state.itemLoading) return h('div', { className: 'dsh-prc-detail' }, t('loading'))
   if (!item || !meta) return h('div', { className: 'dsh-prc-empty' }, h('div', null, t('emptyDetail')), h('div', { style: { fontSize: 12, opacity: .8 } }, t('selectFirst')))
   return h('div', { className: 'dsh-prc-detail' },
@@ -1109,6 +1162,7 @@ function DetailPane({ state, controller, t }) {
       h('div', { className: 'dsh-prc-actions' },
         isUser ? [
           h('button', { key: 'e', className: 'dsh-prc-btn', 'data-primary': 'true', onClick: () => controller.editSelected() }, '✎ ' + t('edit')),
+          h('button', { key: 'a', className: 'dsh-prc-btn', title: t('atAgentTitle'), onClick: atAgent }, '@ ' + t('atAgent')),
           h('button', { key: 'r', className: 'dsh-prc-btn', onClick: () => controller.setState({ dialog: { type: 'rename', id: meta.id, name: meta.fileName } }) }, t('rename')),
           !confirmDelete
             ? h('button', { key: 'd', className: 'dsh-prc-btn', onClick: () => setConfirmDelete(true) }, '🗑 ' + t('delete'))
@@ -1117,9 +1171,10 @@ function DetailPane({ state, controller, t }) {
               h('button', { className: 'dsh-prc-btn', 'data-danger': 'true', onClick: () => { setConfirmDelete(false); controller.removeProcess(meta.id) } }, t('confirm')),
               h('button', { className: 'dsh-prc-btn', onClick: () => setConfirmDelete(false) }, t('cancel'))),
         ] : [
+          h('button', { key: 'a', className: 'dsh-prc-btn', title: t('atAgentBundledTitle'), onClick: atAgent }, '@ ' + t('atAgent')),
           h('button', { key: 'c', className: 'dsh-prc-btn', 'data-primary': 'true', onClick: () => controller.setState({ dialog: { type: 'copy', fromId: meta.id } }) }, '⧉ ' + t('copyToMine')),
         ],
-        h('button', { key: 'r', className: 'dsh-prc-btn', 'data-primary': 'true', title: t('runCreate'), onClick: () => controller.setState({ dialog: { type: 'newrun', processId: meta.id } }) }, t('runCreate')),
+        h('button', { key: 'run', className: 'dsh-prc-btn', 'data-primary': 'true', title: t('runCreate'), onClick: () => controller.setState({ dialog: { type: 'newrun', processId: meta.id } }) }, t('runCreate')),
         h('button', { key: 'x', className: 'dsh-prc-btn', onClick: copyYaml }, t('copyYaml')))),
     h('div', { className: 'dsh-prc-chips' },
       h('span', { className: 'dsh-prc-chip' }, isUser ? t('mine') : t('readOnly')),
