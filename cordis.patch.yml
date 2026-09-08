@@ -1,0 +1,13 @@
+# @weibaohui/dsh-process bundle patch: contributes the plugin row into the
+# host composition when this package is installed via `dsh plugin add`.
+#
+# HOST-PLANE plugin: scans the ntd process libraries (~/.ntd/processes writable
+# + ~/.ntd/bundled/processes read-only), serves same-origin JSON + SSE routes
+# under /dsh-process/*, registers the process_* agent tools and a short
+# systemPrompt section. The `dsh.client` declaration in package.json makes the
+# browser half (client/bundle.js) load in the web GUI. It must land in the host
+# composition (this insert), never inside an agent preset.
+
+- insert:
+    - id: dsh-process
+      name: '@weibaohui/dsh-process'
