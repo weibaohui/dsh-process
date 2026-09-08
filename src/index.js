@@ -134,15 +134,15 @@ module.exports = {
       },
       logger,
     })
-    ctx.effect(() => () => store.dispose(), 'dsh-process: store')
     void fileLoaded.then(() => { store.startWatch(); return store.load() })
 
     // ── 运行台账 + 执行驱动（v0.2）──
     const runs = new RunStore(join(dshHome(), 'dsh-process', 'runs.json'), logger)
     const execution = new ExecutionService({ ctx, runs, settings, logger })
+    ctx.effect(() => () => { execution.dispose(); store.dispose() }, 'dsh-process: store+execution dispose')
     ctx.effect(() => () => { /* runs 的 persist 定时器 unref，无需显式清理 */ }, 'dsh-process: runs')
     void runs.load().then(() => execution.tick())
-    const createRun = async ({ processId, workspaceId, model, provider }) => {
+    const createRun = async ({ processId, workspaceId, model, provider, userInput }) => {
       if (runs.byStatus('queued', 'running').length >= 20) throw new StoreError('invalid_input', '排队/运行中的运行过多（上限 20）')
       const item = await store.get(processId)
       const parsed = parseProcessYaml(item.yaml)
@@ -154,7 +154,7 @@ module.exports = {
       const { map } = require('./runs.js').indexLinks(snapshot)
       if (map.size === 0) throw new StoreError('invalid', '工艺没有任何环节，无法运行')
       const run = runs.create({
-        processId, workspaceId, model, provider,
+        processId, workspaceId, model, provider, userInput,
         processName: result.meta.name || item.meta.name,
         displayName: result.meta.display_name || result.meta.name || item.meta.name,
         snapshotYaml: item.yaml, snapshot,

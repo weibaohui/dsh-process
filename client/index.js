@@ -101,6 +101,7 @@ const ZH = {
   breakTitle: '门禁未过，等待你的裁决', decisionRetry: '重试本环节', decisionSkip: '跳过本环节', decisionStop: '中止运行',
   linkPending: '待跑', linkDone: '完成', linkRunning: '进行中', linkGateFailed: '门禁未过', linkSkipped: '跳过', linkFailed: '失败', linkAbandoned: '中断',
   currentStep: '当前', runError: '运行异常',
+  runUserInput: '需求 / 要处理的问题（必填，会注入每个环节）', runUserInputPh: '例如：把「XX」这条口头需求整理成 PRD 并拆解任务',
   tabFlow: '流程图',
   flowGate: '门禁 ≥{min}', flowRework: '返工≤{n}', flowNoGate: '无门禁',
   flowLegendForward: '正常流转', flowLegendJump: '跳转', flowLegendFail: '门禁未过回跳', flowLegendBreak: '中止（不连线）',
@@ -170,6 +171,7 @@ const EN = {
   breakTitle: 'Gate failed — awaiting your decision', decisionRetry: 'Retry this link', decisionSkip: 'Skip this link', decisionStop: 'Stop run',
   linkPending: 'pending', linkDone: 'done', linkRunning: 'running', linkGateFailed: 'gate failed', linkSkipped: 'skipped', linkFailed: 'failed', linkAbandoned: 'abandoned',
   currentStep: 'current', runError: 'run error',
+  runUserInput: 'Requirement / what to work on (required, injected into every link)', runUserInputPh: 'e.g. turn requirement XX into a PRD and split tasks',
   tabFlow: 'Flow',
   flowGate: 'gate ≥{min}', flowRework: 'rework≤{n}', flowNoGate: 'no gate',
   flowLegendForward: 'forward', flowLegendJump: 'jump', flowLegendFail: 'gate-fail back', flowLegendBreak: 'break (no edge)',
@@ -1583,6 +1585,7 @@ function RunBoard({ state, controller, t }) {
       run.error ? h('span', { className: 'dsh-prc-badge', 'data-kind': 'err' }, t('runError') + ': ' + run.error) : null,
       h('span', { style: { fontSize: 11, opacity: .6 } }, new Date(run.updatedAt).toLocaleString())),
   ]
+  if (run.userInput) children.push(h('div', { className: 'dsh-prc-kv', style: { background: 'var(--dsw-alias-bg-layer-2, rgba(128,128,128,.06))', border: '1px solid var(--dsw-alias-border-l1, rgba(128,128,128,.2))', borderRadius: 8, padding: '6px 10px' } }, h('b', null, '📌 ' + t('runUserInput') + '：'), h('span', { style: { whiteSpace: 'pre-wrap' } }, run.userInput)))
   children.push(h('div', { className: 'dsh-prc-sec' }, h(FlowGraph, { t, parsed: run.snapshot, run })))
   if (run.pendingBreak) {
     children.push(h('div', { className: 'dsh-prc-break' },
@@ -1621,25 +1624,33 @@ function NewRunDialog({ state, controller, t }) {
   const dlg = state.dialog
   const [workspaces, setWorkspaces] = useState(null)
   const [ws, setWs] = useState('')
+  const [req, setReq] = useState('')
   useEffect(() => {
     api('/workspaces').then((d) => setWorkspaces(d.workspaces || [])).catch(() => setWorkspaces([]))
   }, [])
   const proc = state.processes.find((p) => p.id === dlg.processId)
   const [busy, setBusy] = useState(false)
+  const reqOk = req.trim() !== ''
   return h(Modal, { title: t('runCreate') + '：' + (proc ? (proc.display_name || proc.name) : ''), onClose: () => controller.setState({ dialog: null }) },
     h('div', { className: 'dsh-prc-kv' }, h('b', null, t('name') + ':'), proc ? proc.relPath : '—'),
+    h('label', { className: 'dsh-prc-field' }, t('runUserInput'),
+      h('textarea', {
+        value: req, placeholder: t('runUserInputPh'), spellCheck: false, rows: 4,
+        style: { width: '100%', resize: 'vertical', fontFamily: 'var(--dsw-font-family, inherit)', fontSize: 13, lineHeight: 1.6, border: '1px solid var(--dsw-alias-border-l2,rgba(128,128,128,.3))', borderRadius: 8, padding: '8px 10px', background: 'var(--dsw-alias-bg-layer-2,transparent)', color: 'inherit', boxSizing: 'border-box' },
+        onChange: (e) => setReq(e.target.value),
+      })),
     h('label', { className: 'dsh-prc-field' }, t('runWorkspace'),
       h('select', { value: ws, onChange: (e) => setWs(e.target.value) },
         workspaces === null ? h('option', { value: '' }, t('loading')) : [
           h('option', { key: '_', value: '' }, t('workspaceDefault')),
           workspaces.map((w) => h('option', { key: w.id, value: w.id }, w.title)),
         ])),
-    h('div', { style: { fontSize: 12, opacity: .7 } }, '每个环节开一个全新会话执行；门禁由评审会话打分，不过按 on_gate_fail 流转，返工不超过 max_rework。'),
+    h('div', { style: { fontSize: 12, opacity: .7 } }, '每个环节开一个全新会话执行；用户需求会注入每个环节；门禁由评审会话打分，不过按 on_gate_fail 流转，返工不超过 max_rework。'),
     h('div', { style: { display: 'flex', gap: 8, justifyContent: 'flex-end' } },
       h('button', { className: 'dsh-prc-btn', onClick: () => controller.setState({ dialog: null }) }, t('cancel')),
-      h('button', { className: 'dsh-prc-btn', 'data-primary': 'true', disabled: busy || !proc, onClick: async () => {
+      h('button', { className: 'dsh-prc-btn', 'data-primary': 'true', disabled: busy || !proc || !reqOk, onClick: async () => {
         setBusy(true)
-        try { await controller.createRun({ processId: dlg.processId, workspaceId: ws || undefined }) } catch (error) { controller.toast(String(error && error.message || error), 'err') } finally { setBusy(false) }
+        try { await controller.createRun({ processId: dlg.processId, workspaceId: ws || undefined, userInput: req.trim() }) } catch (error) { controller.toast(String(error && error.message || error), 'err') } finally { setBusy(false) }
       } }, t('runCreate'))))
 }
 

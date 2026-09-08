@@ -56,11 +56,18 @@ class ExecutionService {
     this.active = new Map() // runId → driveLoop promise
     const parsed = Number.parseInt(process.env.DSH_PROCESS_MAX_CONCURRENT ?? '', 10)
     this.maxConcurrent = Number.isInteger(parsed) && parsed >= 1 ? parsed : 2
+    this.disposed = false
   }
+
+  /** 宿主卸载/重启时置位：延迟 tick 与在飞收尾不得再碰 ctx。 */
+  dispose() { this.disposed = true }
 
   /** 容量允许时从队列拉起运行；在 run 收尾后也要再 tick 一次。 */
   tick() {
-    if (!this.ctx || !this.ctx.agents) return
+    if (this.disposed) return
+    let agents
+    try { agents = this.ctx.agents } catch { return } // ctx 已失效（宿主重启后残留 tick）：静默退出，绝不抛——这里抛错=整个 web 启动失败
+    if (!agents) return
     const queued = this.runs.byStatus('queued')
     for (const run of queued) {
       if (this.active.size >= this.maxConcurrent) break
@@ -189,10 +196,14 @@ class ExecutionService {
 
   buildLinkPrompt(run, entry) {
     const { link, phase } = entry
+    const userBlock = run.userInput
+      ? ['【本次运行的用户需求】（环节指令要围绕它展开，这是用户这次真正要处理的事）', run.userInput, ''].join('\n')
+      : ''
     const artifacts = Array.isArray(link.expected_artifacts) && link.expected_artifacts.length > 0
       ? link.expected_artifacts.map((a) => `- ${a && a.name || 'artifact'}${a && a.path ? `（${a.path}）` : ''}`).join('\n')
       : '（本环节未声明产物）'
     return [
+      userBlock,
       `你正在执行工艺「${run.displayName || run.processName}」的一个环节，只做本环节的事，不要越界到其他环节。`,
       `环节：${phase && phase.name ? `${phase.name} / ` : ''}${link.name || link.id}（id=${link.id}）`,
       link.expert_name || link.expert ? `建议以专家「${link.expert_name || link.expert}」的标准与视角执行。` : '',
@@ -293,6 +304,7 @@ class ExecutionService {
     const prompt = [
       '你是工艺门禁评审员。对下面这次环节执行打分，只输出一个 JSON 对象：{"score": 0-100整数, "reason": "一句话理由"}。',
       `门禁：${gate.name || '(未命名)'}（评审方式 ${type}）；通过分数线：${typeof gate.min_score === 'number' ? gate.min_score : 0}。`,
+      run.userInput ? `【本次运行的用户需求】${run.userInput}` : '',
       '',
       `【环节指令】\n${entry.link.prompt || '(空)'}`,
       `【执行报告】\n${output || '(无输出)'}`,

@@ -160,12 +160,13 @@ class RunStore {
     await fsP.rename(tmp, this.file)
   }
 
-  create({ processId, processName, displayName, snapshotYaml, snapshot, workspaceId, model, provider }) {
+  create({ processId, processName, displayName, snapshotYaml, snapshot, workspaceId, model, provider, userInput }) {
     const run = {
       id: 'run-' + randomUUID().slice(0, 8),
       processId, processName, displayName,
       snapshotYaml, snapshot,
       workspaceId: workspaceId || undefined,
+      userInput: typeof userInput === 'string' && userInput.trim() !== '' ? userInput.trim().slice(0, 4000) : undefined,
       model: model || undefined, provider: provider || undefined,
       status: 'queued',            // queued|running|paused|awaiting|done|stopped|failed
       trail: [],
