@@ -5,7 +5,7 @@
  * - 侧栏入口行（DOM 注入「新会话」下方，与任务看板同一家族块；滚动数字 = 我的 | 内置）。
  * - 主页面：官方 root 级 `shell.overlay` slot（列表+详情/编辑器全页工作台；侧栏保持可点；
  *   Esc / 点会话行 / 与其他面板互斥时关闭）。
- * - 设置页 section（settings.section，M3）：根目录配置 + 打开工艺库。
+ * - 兜底：shell.overlay 未渲染的壳层组合下，开面板 450ms 自动改走中栏注入。
  *
  * 数据流：EventSource /dsh-process/events 变更帧 → 全量 refetch + revision 追赶
  * （taskboard S16 同款）；编辑走 baseHash 乐观锁，409 给「重新加载 / 仍然覆盖」。
@@ -471,6 +471,15 @@ class Controller {
     this.setState({ panelOpen: true })
     try { document.dispatchEvent(new CustomEvent(ACTIVATE_EVENT, { detail: PANEL_NAME })) } catch {}
     if (!this.state.loaded) void this.refresh()
+    // 兜底：shell.overlay 在某些壳层组合下不渲染 → 450ms 后仍无面板就改走中栏注入，
+    // 保证侧栏入口点击永远有响应
+    setTimeout(() => {
+      if (this.disposed) return
+      const s = this.getSnapshot()
+      if (s.panelOpen && typeof document !== 'undefined' && !document.querySelector('[data-dsh-prc-panel]')) {
+        mountFallbackPanel(this)
+      }
+    }, 450)
   }
   closePanel() { this.setState({ panelOpen: false, dialog: null }) }
   togglePanel() { if (this.state.panelOpen) this.closePanel(); else this.openPanel() }
@@ -1616,18 +1625,6 @@ function NewRunDialog({ state, controller, t }) {
       } }, t('runCreate'))))
 }
 
-// ── 设置页 section（M3） ─────────────────────────────────────────────────
-
-function SettingsSection({ t }) {
-  useEffect(ensureStyles, [])
-  return h('div', { style: { padding: '4px 0' } },
-    h('div', { style: { fontSize: 12, opacity: .7, marginBottom: 8 } }, t('settingsSectionHint')),
-    h('button', { className: 'dsh-prc-btn', onClick: () => {
-      const evt = new CustomEvent('dsh-prc-toggle-panel')
-      document.dispatchEvent(evt)
-    } }, t('openLib')))
-}
-
 // ── 挂载 ─────────────────────────────────────────────────────────────────
 
 const name = CLIENT_NAME
@@ -1646,19 +1643,34 @@ function mountOverlaySlot(ctx, controller, t) {
   }, 'dsh-process: overlay slot')
 }
 
-function mountSettingsSection(ctx, t) {
-  ctx.effect(() => {
-    try {
-      ctx.slots.inject('settings.section', () => ctx.slots.register(
-        { name: 'settings.section', id: 'dsh-process', order: 93, locale: NS, label: () => t('title'), inject: () => ({}) },
-        function ProcessSettingsSection() { return h(SettingsSection, { t }) },
-      ))
-    } catch (e) { (globalThis.__prcErrors = globalThis.__prcErrors || []).push('settings:' + (e && e.message)); console.error('[dsh-process] settings slot:', e) }
-  }, 'dsh-process: settings section')
-}
-
 let ReactGlobal = null
 try { ReactGlobal = require('react') } catch {}
+
+/** 同页重复 apply 防护：上一次挂载的 teardown（apply 内赋值）。 */
+let activeApplyTeardown = null
+
+/** overlay 未渲染时的兜底挂载（taskboard 式中栏注入；仅开面板 450ms 后仍无面板才走）。 */
+let fallbackMount = null
+function mountFallbackPanel(controller) {
+  if (fallbackMount) return
+  try {
+    const column = document.querySelector('[data-pane="conversation"], [class*="centerCol"], .dshDesktopConversationSurface')
+    if (!column) return
+    const container = document.createElement('div')
+    container.style.cssText = 'position:fixed;inset:0;z-index:30;pointer-events:none;'
+    column.appendChild(container)
+    const root = require('react-dom/client').createRoot(container)
+    root.render(h('div', { style: { pointerEvents: 'auto', display: 'contents' } },
+      h(ProcessPanel, { controller, t: controller.t || makeT(null), slotProps: null })))
+    fallbackMount = { container, root }
+  } catch (e) { console.error('[dsh-process] fallback mount:', e) }
+}
+function unmountFallbackPanel() {
+  if (!fallbackMount) return
+  try { fallbackMount.root.unmount() } catch {}
+  try { fallbackMount.container.remove() } catch {}
+  fallbackMount = null
+}
 
 const moduleExports = {
   name,
@@ -1697,22 +1709,22 @@ const moduleExports = {
     try {
       if (typeof ctx.inject === 'function') ctx.inject(['sessions'], (scope) => { controller.sessionsSvc = scope && scope.sessions })
     } catch (e) { console.error('[dsh-process] sessions inject:', e) }
+    // 同页重复 apply（重建/热重载）：先拆掉上一次挂载，避免残留失效的入口行
+    if (typeof activeApplyTeardown === 'function') { try { activeApplyTeardown() } catch {} activeApplyTeardown = null }
     const disposers = []
     try { disposers.push(mountSidebarEntry(controller, t)) } catch (e) { console.error('[dsh-process] sidebar mount:', e) }
     mountOverlaySlot(ctx, controller, t)
-    mountSettingsSection(ctx, t)
-    // 设置页按钮 → 切换面板（无 slot 通信面，走文档事件）
-    const onToggle = () => controller.togglePanel()
-    document.addEventListener('dsh-prc-toggle-panel', onToggle)
     // 与其他面板互斥
     const onActivate = (event) => { if (event.detail !== PANEL_NAME && controller.getSnapshot().panelOpen) controller.closePanel() }
     document.addEventListener(ACTIVATE_EVENT, onActivate)
-    ctx.effect(() => () => {
-      document.removeEventListener('dsh-prc-toggle-panel', onToggle)
+    const teardown = () => {
       document.removeEventListener(ACTIVATE_EVENT, onActivate)
+      unmountFallbackPanel()
       for (const d of disposers) { try { d() } catch {} }
       controller.dispose()
-    }, 'dsh-process: client mount')
+    }
+    activeApplyTeardown = teardown
+    ctx.effect(() => teardown, 'dsh-process: client mount')
   },
 }
 
