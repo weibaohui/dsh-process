@@ -50,16 +50,20 @@ test('buildFlowModel: 悬空 goto 不产生边（校验器负责报错）', () =
   assert.ok(m3.warnings.length > 0)
 })
 
-test('layoutFlowGraph: rank 顺序 + 回边识别', () => {
+test('layoutFlowGraph: 蛇形排布 + 回边识别', () => {
   const m2 = buildFlowModel(GOTO_BACK)
   const layout = layoutFlowGraph(m2)
-  const r = (id) => layout.positions.get(id).x
-  assert.ok(r('__start') < r('s1'))
-  assert.ok(r('s1') < r('s2') && r('s2') < r('s3'))
-  assert.ok(r('s3') < r('__end'))
+  const p = (id) => layout.positions.get(id)
+  // START 在首环节上方、END 在末环节下方
+  assert.ok(p('__start').y < p('s1').y)
+  assert.ok(p('s3').y < p('__end').y)
+  // 同行按声明序从左到右
+  assert.ok(p('s1').x < p('s2').x && p('s2').x < p('s3').x)
   // s1→s1 自环、s2→s1 回边：都不参与分层
   assert.ok(layout.loops.has('s1→s1'))
-  assert.ok(layout.backEdges.has('s2→s1'))
+  // 蛇形布局：同一行内 s2→s1 是逆方向回边（路由走上方弧线）
+  assert.equal(layout.meta.get('s1').row, layout.meta.get('s2').row)
+  assert.equal(layout.meta.get('s1').row, layout.meta.get('s3').row)
 })
 
 test('layoutFlowGraph: 分支跳转前向边分层', () => {
@@ -71,8 +75,9 @@ test('layoutFlowGraph: 分支跳转前向边分层', () => {
   const m = buildFlowModel(BRANCH)
   const layout = layoutFlowGraph(m)
   const x = (id) => layout.positions.get(id).x
+  const y = (id) => layout.positions.get(id).y
   assert.ok(x('a') < x('c') && x('b') < x('c'))
-  assert.equal(x('a'), x('b'), 'a/b 同层并列（都只指向 c）')
+  assert.equal(y('a'), y('b'), 'a/b 同行并列')
 })
 
 test('buildFlowModel: 空坏输入返回 null', () => {

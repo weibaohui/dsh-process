@@ -1927,66 +1927,36 @@ window.__ModuleLoader__.load({
       const positions = new Map()
       const backEdges = new Set()
       const loops = new Set()
-      if (nodes.length === 0) return { positions, width: 200, height: 120, backEdges, loops }
+      const meta = new Map() // id → { row, col, dir }（蛇形排布信息，边路由用）
+      const n = nodes.length
+      if (n === 0) return { positions, width: 200, height: 120, backEdges, loops, meta }
 
-      const ids = [START_ID, ...nodes.map((n) => n.id), END_ID]
-      const out = new Map(ids.map((id) => [id, []]))
-      const forward = []   // 参与分层的边
+      // 蛇形排布：每行 K 个（3-5，按 n 取平方根级别），奇数行反向，图变紧凑可读
+      const K = Math.max(3, Math.min(5, Math.ceil(Math.sqrt(n))))
+      const rowH = FLOW_NODE_H + FLOW_GAP_Y * 2
+      nodes.forEach((nd, i) => {
+        const row = Math.floor(i / K)
+        const colInRow = i % K
+        const dir = row % 2 === 0 ? 1 : -1
+        const col = dir === 1 ? colInRow : K - 1 - colInRow
+        positions.set(nd.id, {
+          x: FLOW_PAD + col * (FLOW_NODE_W + FLOW_GAP_X),
+          y: FLOW_PAD + LOOP_BACK_PAD + row * rowH,
+        })
+        meta.set(nd.id, { row, col, dir })
+      })
+      const rows = Math.ceil(n / K)
+      const first = nodes[0].id, last = nodes[n - 1].id
+      const firstPos = positions.get(first), lastPos = positions.get(last)
+      positions.set(START_ID, { x: firstPos.x + FLOW_NODE_W / 2 - 60, y: firstPos.y - 52 })
+      positions.set(END_ID, { x: lastPos.x + FLOW_NODE_W / 2 - 60, y: lastPos.y + FLOW_NODE_H + 22 })
       for (const e of edges) {
         const key = e.from + '→' + e.to
-        if (e.from === e.to) { loops.add(key); continue }
-        if (e.kind !== 'fail' && e.to !== START_ID && e.from !== END_ID) {
-          forward.push(e)
-        } else backEdges.add(key)
+        if (e.from === e.to) loops.add(key)
       }
-
-      // rank：forward 边最长路径（迭代松弛，有环时靠上限收敛）
-      const rank = new Map(ids.map((id) => [id, id === START_ID ? 0 : 1]))
-      for (let iter = 0; iter < ids.length + 1; iter++) {
-        let changed = false
-        for (const e of forward) {
-          const r = rank.get(e.from) + 1
-          if (r > (rank.get(e.to) ?? -Infinity) && rank.get(e.to) !== 0 && !(e.to === START_ID)) {
-            if (e.to === END_ID) { if (r > rank.get(END_ID)) { rank.set(END_ID, r); changed = true } }
-            else if (r <= nodes.length + 1) { rank.set(e.to, r); changed = true }
-          }
-        }
-        if (!changed) break
-      }
-      // 收紧：无入边的非 START 节点贴着最小可用 rank（减小空洞）
-      for (const id of ids) {
-        if (id === START_ID) continue
-        const incoming = forward.filter((e) => e.to === id)
-        if (incoming.length === 0 && rank.get(id) > 1) rank.set(id, 1)
-      }
-
-      // 层内排序：同 rank 按声明序
-      const decl = new Map(nodes.map((n, i) => [n.id, i]))
-      const byRank = new Map()
-      for (const id of ids) {
-        const r = rank.get(id)
-        if (!byRank.has(r)) byRank.set(r, [])
-        byRank.get(r).push(id)
-      }
-      for (const list of byRank.values()) {
-        list.sort((a, b) => (decl.get(a) ?? -1) - (decl.get(b) ?? -1) || a.localeCompare(b))
-      }
-      const maxRank = Math.max(...[...byRank.keys()])
-      for (const [r, list] of byRank) {
-        list.forEach((id, i) => positions.set(id, {
-          x: FLOW_PAD + r * (FLOW_NODE_W + FLOW_GAP_X),
-          y: FLOW_PAD + LOOP_BACK_PAD + i * (FLOW_NODE_H + FLOW_GAP_Y),
-        }))
-      }
-      // END 挂在最右
-      if (!positions.has(END_ID)) {
-        const maxR = maxRank
-        positions.set(END_ID, { x: FLOW_PAD + (maxR + 1) * (FLOW_NODE_W + FLOW_GAP_X), y: FLOW_PAD + LOOP_BACK_PAD })
-      }
-      const width = FLOW_PAD * 2 + (maxRank + 2) * (FLOW_NODE_W + FLOW_GAP_X)
-      const maxPerLayer = Math.max(1, ...[...byRank.values()].map((l) => l.length))
-      const height = FLOW_PAD * 2 + LOOP_BACK_PAD + maxPerLayer * (FLOW_NODE_H + FLOW_GAP_Y)
-      return { positions, width, height, backEdges, loops }
+      const width = FLOW_PAD * 2 + K * (FLOW_NODE_W + FLOW_GAP_X) - FLOW_GAP_X
+      const height = FLOW_PAD * 2 + LOOP_BACK_PAD + rows * rowH + 60
+      return { positions, width, height, backEdges, loops, meta }
     }
 
 
@@ -2037,24 +2007,37 @@ window.__ModuleLoader__.load({
         const from = pos.get(e.from)
         const to = pos.get(e.to)
         if (!from || !to) return null
-        const isBack = layout.backEdges.has(e.from + '→' + e.to)
         const isLoop = layout.loops.has(e.from + '→' + e.to)
-        if (e.from === START_ID) return { d: 'M' + (from.x + FLOW_NODE_W / 2) + ' ' + (from.y + 14) + ' L' + (to.x) + ' ' + (to.y + FLOW_NODE_H / 2), label: null }
-        if (e.to === END_ID) return { d: 'M' + (from.x + FLOW_NODE_W) + ' ' + (from.y + FLOW_NODE_H / 2) + ' L' + (to.x) + ' ' + (to.y + 16), label: null }
+        if (e.from === START_ID) return { d: 'M' + (from.x + FLOW_NODE_W / 2) + ' ' + (from.y + 30) + ' L' + (to.x + FLOW_NODE_W / 2) + ' ' + to.y, label: null }
+        if (e.to === END_ID) return { d: 'M' + (from.x + FLOW_NODE_W / 2) + ' ' + (from.y + FLOW_NODE_H) + ' L' + (to.x + FLOW_NODE_W / 2) + ' ' + to.y, label: null }
         if (isLoop) {
           const sx = from.x + FLOW_NODE_W, sy = from.y + 18
           return { d: 'M' + sx + ' ' + sy + ' C' + (sx + 46) + ' ' + sy + ' ' + (sx + 46) + ' ' + (sy + 30) + ' ' + sx + ' ' + (sy + 34), label: null }
         }
-        if (isBack) {
-          const sx = from.x + FLOW_NODE_W / 2, sy = from.y
-          const tx = to.x + FLOW_NODE_W / 2, ty = to.y
-          const lift = Math.min(LOOP_BACK_PAD - 6, 12 + (sy - ty) * 0.18)
-          return { d: 'M' + sx + ' ' + sy + ' C' + sx + ' ' + (sy - lift) + ' ' + tx + ' ' + (ty - lift) + ' ' + tx + ' ' + ty, label: e.kind === 'fail' ? e.label : (e.label || '') }
+        const mf = layout.meta.get(e.from), mt = layout.meta.get(e.to)
+        if (!mf || !mt) return null
+        // 同行：顺向直线；逆向/跨列走节点上方弧线（含 fail 回边）
+        if (mf.row === mt.row) {
+          const toRight = mt.col > mf.col
+          const inFlowDir = toRight === (mf.dir === 1)
+          const sx = toRight ? from.x + FLOW_NODE_W : from.x
+          const tx = toRight ? to.x : to.x + FLOW_NODE_W
+          const y = from.y + FLOW_NODE_H / 2
+          if (Math.abs(mt.col - mf.col) === 1 && inFlowDir) return { d: 'M' + sx + ' ' + y + ' L' + tx + ' ' + y, label: e.label || null }
+          const ax = (sx + tx) / 2
+          return { d: 'M' + sx + ' ' + (from.y) + ' C' + sx + ' ' + (from.y - 34) + ' ' + tx + ' ' + (to.y - 34) + ' ' + tx + ' ' + to.y, label: e.label || null, arcY: Math.min(from.y, to.y) - 24, ax }
         }
-        const sx = from.x + FLOW_NODE_W, sy = from.y + FLOW_NODE_H / 2
-        const tx = to.x, ty = to.y + FLOW_NODE_H / 2
-        const dx = Math.max(28, (tx - sx) / 2)
-        return { d: 'M' + sx + ' ' + sy + ' C' + (sx + dx) + ' ' + sy + ' ' + (tx - dx) + ' ' + ty + ' ' + tx + ' ' + ty, label: e.label || null }
+        // 相邻行的同列：垂直直落
+        if (mt.row === mf.row + 1 && mt.col === mf.col) {
+          return { d: 'M' + (from.x + FLOW_NODE_W / 2) + ' ' + (from.y + FLOW_NODE_H) + ' L' + (to.x + FLOW_NODE_W / 2) + ' ' + to.y, label: e.label || null }
+        }
+        // 跨行任意：经两行间隙的 S 曲线（fail 回到更早行则走上方）
+        const sx = from.x + FLOW_NODE_W / 2
+        const sy = mt.row > mf.row ? from.y + FLOW_NODE_H : from.y
+        const tx = to.x + FLOW_NODE_W / 2
+        const ty = mt.row > mf.row ? to.y : to.y + FLOW_NODE_H
+        const midY = (sy + ty) / 2
+        return { d: 'M' + sx + ' ' + sy + ' C' + sx + ' ' + midY + ' ' + tx + ' ' + midY + ' ' + tx + ' ' + ty, label: e.label || null }
       }
 
       const nodeSvg = (id) => {
@@ -2107,7 +2090,8 @@ window.__ModuleLoader__.load({
         edgeSvgs.push(h('path', { key: e.from + '→' + e.to + e.kind, d: path.d, fill: 'none', stroke: color, strokeWidth: e.kind === 'fail' ? 1.8 : 1.4, strokeDasharray: dashed, markerEnd: 'url(#dsh-prc-arrow-' + (e.kind === 'fail' ? 'f' : e.kind === 'jump' ? 'j' : 'n') + ')' }))
         if (path.label) {
           const from = pos.get(e.from), to = pos.get(e.to)
-          const mx = (from.x + to.x + FLOW_NODE_W) / 2, my = Math.min(from.y, to.y) - 6
+          const mx = path.ax !== undefined ? path.ax : (from.x + to.x + FLOW_NODE_W) / 2
+          const my = path.arcY !== undefined ? path.arcY - 8 : Math.min(from.y, to.y) - 6
           edgeSvgs.push(h('text', { key: e.from + '→' + e.to + e.kind + 'lbl', x: mx, y: my, textAnchor: 'middle', fontSize: 10, fill: e.kind === 'fail' ? 'var(--dsw-alias-state-error, #ef4444)' : '#16a34a', fontWeight: 600 }, escXml(path.label).slice(0, 30)))
         }
       }
