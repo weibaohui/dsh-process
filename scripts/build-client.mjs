@@ -33,12 +33,16 @@ try {
   kitSource = readFileSync(kitPath, 'utf8')
 } catch { /* kit 未安装：bundle 照常产出，消费者需保证不触发 PluginKit 分支 */ }
 
-// yaml 库内联（esbuild IIFE → var YamlLib，先 `npm i -D esbuild` 再跑
-// scripts/make-yaml-bundle.mjs 生成 yaml-bundle.js）：表单编辑的 Document API
-// 需要 yaml，loader 不提供该平台模块，因此构建期内联（+~250KB）。
+// yaml 打包体以**字符串**注入 factory 顶部（最先执行），运行时经 new Function
+// 隔离求值：factory 作用域内直接 `var YamlLib=(()=>{...})()` 会在页面加载期
+// 构造 lib，其他插件加载期临时污染的全局会被固化进 lib 内部状态，parseDocument
+// 对特定输入死循环（2026-09-09 表单编辑挂死根因）。隔离 + 首次使用时构造双保险。
 let yamlBundleText = ''
 const yamlBundlePath = join(here, "yaml-bundle.js")
-if (existsSync(yamlBundlePath)) yamlBundleText = readFileSync(yamlBundlePath, 'utf8')
+if (existsSync(yamlBundlePath)) {
+  const yamlSource = readFileSync(yamlBundlePath, 'utf8')
+  yamlBundleText = `var YamlLibSrc = ${JSON.stringify(yamlSource)};\nvar YamlLib = null;\nfunction makeYamlLibIsolated() { return new Function(YamlLibSrc + "\\n;return YamlLib")() }\n`
+}
 
 const banner = `/* Generated from client/index.js by scripts/build-client.mjs — do not edit by hand.
  * Regenerate with: npm run build:client
