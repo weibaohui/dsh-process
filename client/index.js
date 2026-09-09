@@ -106,6 +106,15 @@ const ZH = {
   linkPending: '待跑', linkDone: '完成', linkRunning: '进行中', linkGateFailed: '门禁未过', linkSkipped: '跳过', linkFailed: '失败', linkAbandoned: '中断',
   currentStep: '当前', runError: '运行异常',
   runUserInput: '需求 / 要处理的问题（必填，会注入每个环节）', runUserInputPh: '例如：把「XX」这条口头需求整理成 PRD 并拆解任务',
+  formMode: '表单', yamlMode: 'YAML', formUnparseable: '当前 YAML 有语法错误，请切到 YAML 模式修复后再用表单',
+  formBasic: '基本信息', formLimits: '限额', formPhases: '阶段', formAddPhase: '+ 添加阶段', formAddLink: '+ 添加环节',
+  formDelPhase: '删除阶段', formDelLink: '删除环节', formAddGate: '+ 添加门禁', formGateName: '门禁名（如 产物存在）', formGateMin: '分数线',
+  formSkillsPh: '技能1, 技能2', formIdHint: 'id 被流转引用，改动会自动级联更新引用',
+  formDisplayName: '显示名', formVersion: '版本', formCategory: '分类', formComplexity: '复杂度', formDescription: '描述',
+  formMaxSteps: '环节执行上限（空=不限）', formMaxTokens: 'token 上限（空=不限）', formPrompt: '指令 prompt',
+  formAcceptance: '验收标准', formPhaseName: '阶段名', formPhaseSpec: '阶段说明', formExecutor: '执行器', formExpert: '专家',
+  formModel: '模型', formReviewType: '复核方式', formMaxRework: '返工上限', formOnSuccess: '成功后',
+  formOnGateFail: '门禁不过', formOnRatingFail: '评级不过', formNewLinkName: '新环节',
   tabFlow: '流程图',
   flowGate: '门禁 ≥{min}', flowRework: '返工≤{n}', flowNoGate: '无门禁',
   flowLegendForward: '正常流转', flowLegendJump: '跳转', flowLegendFail: '门禁未过回跳', flowLegendBreak: '中止（不连线）',
@@ -180,6 +189,15 @@ const EN = {
   linkPending: 'pending', linkDone: 'done', linkRunning: 'running', linkGateFailed: 'gate failed', linkSkipped: 'skipped', linkFailed: 'failed', linkAbandoned: 'abandoned',
   currentStep: 'current', runError: 'run error',
   runUserInput: 'Requirement / what to work on (required, injected into every link)', runUserInputPh: 'e.g. turn requirement XX into a PRD and split tasks',
+  formMode: 'Form', yamlMode: 'YAML', formUnparseable: 'YAML has syntax errors — fix them in YAML mode before using the form',
+  formBasic: 'Basics', formLimits: 'Limits', formPhases: 'Phases', formAddPhase: '+ Add phase', formAddLink: '+ Add link',
+  formDelPhase: 'Delete phase', formDelLink: 'Delete link', formAddGate: '+ Add gate', formGateName: 'Gate name (e.g. artifact exists)', formGateMin: 'Min score',
+  formSkillsPh: 'skill1, skill2', formIdHint: 'id is referenced by flows; edits cascade to all references',
+  formDisplayName: 'Display name', formVersion: 'Version', formCategory: 'Category', formComplexity: 'Complexity', formDescription: 'Description',
+  formMaxSteps: 'Max step runs (empty = unlimited)', formMaxTokens: 'Max tokens (empty = unlimited)', formPrompt: 'Prompt',
+  formAcceptance: 'Acceptance', formPhaseName: 'Phase name', formPhaseSpec: 'Phase spec', formExecutor: 'Executor', formExpert: 'Expert',
+  formModel: 'Model', formReviewType: 'Review', formMaxRework: 'Max rework', formOnSuccess: 'On success',
+  formOnGateFail: 'On gate fail', formOnRatingFail: 'On rating fail', formNewLinkName: 'New link',
   tabFlow: 'Flow',
   flowGate: 'gate ≥{min}', flowRework: 'rework≤{n}', flowNoGate: 'no gate',
   flowLegendForward: 'forward', flowLegendJump: 'jump', flowLegendFail: 'gate-fail back', flowLegendBreak: 'break (no edge)',
@@ -341,6 +359,14 @@ const STYLE = `
 .dsh-prc-flowlegend .sw.fwd { border-color:var(--dsw-text-secondary, #94a3b8); }
 .dsh-prc-flowlegend .sw.jump { border-color:#22c55e; }
 .dsh-prc-flowlegend .sw.fail { border-color:var(--dsw-alias-state-error, #ef4444); border-top-style:dashed; }
+.dsh-prc-form { flex:1; min-height:0; overflow-y:auto; padding:12px 16px; box-sizing:border-box; }
+.dsh-prc-fsec { margin:0 0 14px; }
+.dsh-prc-fsec h4 { margin:0 0 8px; font-size:13px; }
+.dsh-prc-fgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:8px 12px; }
+.dsh-prc-fphase { border:1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.3)); border-radius:10px; padding:10px 12px; margin:8px 0; background:var(--dsw-alias-bg-layer-1, transparent); }
+.dsh-prc-flink { border:1px solid var(--dsw-alias-border-l1, rgba(128,128,128,.2)); border-radius:8px; padding:8px 10px; margin:8px 0; background:var(--dsw-alias-bg-layer-2, rgba(128,128,128,.04)); }
+.dsh-prc-flink .dsh-prc-field { margin:6px 0; }
+.dsh-prc-fgates { border-top:1px dashed var(--dsw-alias-border-l1, rgba(128,128,128,.2)); padding-top:6px; }
 `
 
 let stylesInjected = false
@@ -564,6 +590,7 @@ class Controller {
   async editSelected() {
     const item = this.state.item
     if (!item) return
+    const t0 = Date.now()
     this.openEditor({ mode: 'update', id: item.meta.id, text: item.yaml, baseHash: item.hash, diagnostics: item.diagnostics })
   }
   async createBlank(name, dir, displayName) {
@@ -751,6 +778,134 @@ function insertComposerText(text) {
   } catch {}
   try { navigator.clipboard.writeText(text) } catch {}
   return 'copied'
+}
+
+
+// ── 表单编辑：Document API 双向同步（v0.4）──────────────────────────────
+
+/** yaml 库：bundle 内联 YamlLib 优先，plain Node（单测）退回 require('yaml')。 */
+function getYamlLib() {
+  try { if (typeof YamlLib !== 'undefined' && YamlLib) return YamlLib } catch {}
+  try { return require('yaml') } catch { return null }
+}
+
+/** 解析编辑器文本为 Document；语法错误返回 null（表单不可用）。 */
+function fmDoc(text) {
+  const lib = getYamlLib()
+  if (!lib) return null
+  try {
+    const doc = lib.parseDocument(String(text || ''), { keepSourceTokens: true })
+    return doc.errors.length === 0 ? doc : null
+  } catch { return null }
+}
+
+/** setIn：写标量/对象；中间节点缺失自动创建。返回新文本。 */
+function fmSet(text, path, value) {
+  const doc = fmDoc(text)
+  if (!doc) return text
+  try { doc.setIn(path, value) } catch { return text }
+  return doc.toString()
+}
+
+/** deleteIn：删除键或序列项。返回新文本。 */
+function fmDel(text, path) {
+  const doc = fmDoc(text)
+  if (!doc) return text
+  try { doc.deleteIn(path) } catch { return text }
+  return doc.toString()
+}
+
+/** 向序列（如 phases / links / gates）追加一个普通对象。 */
+function fmAppend(text, path, value) {
+  const doc = fmDoc(text)
+  if (!doc) return text
+  try {
+    const seq = doc.getIn(path, true)
+    if (seq && typeof seq.add === 'function') seq.add(value)
+    else doc.setIn(path, [value])
+  } catch { return text }
+  return doc.toString()
+}
+
+/** 读路径上的 JS 值（缺失 → dflt）。 */
+function fmGet(text, path, dflt) {
+  const doc = fmDoc(text)
+  if (!doc) return dflt
+  const v = doc.getIn(path)
+  return v === undefined || v === null ? dflt : v
+}
+
+const fmSeqLen = (doc, path) => { const s = doc.getIn(path, true); return s && s.items ? s.items.length : 0 }
+
+/** 删除环节 + 级联：所有指向被删 id 的 on_success/on_gate_fail 重置（next/break）。 */
+function fmDeleteLink(text, phaseIndex, linkIndex) {
+  const doc = fmDoc(text)
+  if (!doc) return text
+  const linksPath = ['phases', phaseIndex, 'links']
+  const deletedId = String(doc.getIn([...linksPath, linkIndex, 'id']) ?? '')
+  try { doc.getIn(linksPath, true).delete(linkIndex) } catch { return text }
+  if (deletedId) {
+    const pc = fmSeqLen(doc, ['phases'])
+    for (let pi = 0; pi < pc; pi++) {
+      const lc = fmSeqLen(doc, ['phases', pi, 'links'])
+      for (let li = 0; li < lc; li++) {
+        for (const field of ['on_success', 'on_gate_fail']) {
+          const v = doc.getIn(['phases', pi, 'links', li, field])
+          if (v === deletedId || v === 'goto:' + deletedId) {
+            doc.setIn(['phases', pi, 'links', li, field], field === 'on_success' ? 'next' : 'break')
+          }
+        }
+      }
+    }
+  }
+  return doc.toString()
+}
+
+/** 删除阶段 + 级联重置其下所有环节 id 的引用。 */
+function fmDeletePhase(text, phaseIndex) {
+  const doc = fmDoc(text)
+  if (!doc) return text
+  const deletedIds = []
+  const lc0 = fmSeqLen(doc, ['phases', phaseIndex, 'links'])
+  for (let li = 0; li < lc0; li++) {
+    const id = doc.getIn(['phases', phaseIndex, 'links', li, 'id'])
+    if (id) deletedIds.push(String(id))
+  }
+  try { doc.getIn(['phases'], true).delete(phaseIndex) } catch { return text }
+  const pc = fmSeqLen(doc, ['phases'])
+  for (let pi = 0; pi < pc; pi++) {
+    const lc = fmSeqLen(doc, ['phases', pi, 'links'])
+    for (let li = 0; li < lc; li++) {
+      for (const field of ['on_success', 'on_gate_fail']) {
+        const v = doc.getIn(['phases', pi, 'links', li, field])
+        if (v && (deletedIds.includes(v) || deletedIds.includes(String(v).replace(/^goto:/, '')))) {
+          doc.setIn(['phases', pi, 'links', li, field], field === 'on_success' ? 'next' : 'break')
+        }
+      }
+    }
+  }
+  return doc.toString()
+}
+
+/** 环节改 id + 级联：所有引用旧 id 的流转值同步替换（含 goto: 前缀）。 */
+function fmSetLinkId(text, phaseIndex, linkIndex, newId) {
+  const doc = fmDoc(text)
+  if (!doc) return text
+  const oldId = String(doc.getIn(['phases', phaseIndex, 'links', linkIndex, 'id']) ?? '')
+  doc.setIn(['phases', phaseIndex, 'links', linkIndex, 'id'], newId)
+  if (!oldId || oldId === newId) return doc.toString()
+  const pc = fmSeqLen(doc, ['phases'])
+  for (let pi = 0; pi < pc; pi++) {
+    const lc = fmSeqLen(doc, ['phases', pi, 'links'])
+    for (let li = 0; li < lc; li++) {
+      for (const field of ['on_success', 'on_gate_fail']) {
+        const v = doc.getIn(['phases', pi, 'links', li, field])
+        if (v === oldId) doc.setIn(['phases', pi, 'links', li, field], newId)
+        else if (v === 'goto:' + oldId) doc.setIn(['phases', pi, 'links', li, field], 'goto:' + newId)
+      }
+    }
+  }
+  return doc.toString()
 }
 
 const ICON = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="1.5" width="5" height="4.5" rx="1"/><rect x="9.5" y="10" width="5" height="4.5" rx="1"/><path d="M4 6v3.5A1.5 1.5 0 0 0 5.5 11h4"/></svg>'
@@ -1196,10 +1351,76 @@ function DetailPane({ state, controller, t }) {
 
 // ── 编辑器 ───────────────────────────────────────────────────────────────
 
+// ── 表单编辑器（v0.4）：与 YAML 实时双向同步 ───────────────────────────
+// 单一数据源 = 编辑器文本（ed.text）。表单字段修改：解析当前文本 →
+// Document setIn/deleteIn/append → toString 写回 ed.text；YAML 子模式
+// 的每次输入同样写回 ed.text——两个视图天然互相同步。
+
+function FormField({ label, children }) {
+  return h('label', { className: 'dsh-prc-field' },
+    h('span', { style: { fontSize: 11, opacity: .75 } }, label),
+    children)
+}
+
+function FormText({ value, onChange, placeholder, multiline, rows, type }) {
+  const style = { width: '100%', fontFamily: type === 'mono' ? 'ui-monospace, Menlo, monospace' : 'var(--dsw-font-family, inherit)', fontSize: 12.5, lineHeight: multiline ? 1.55 : 1.4, border: '1px solid var(--dsw-alias-border-l2,rgba(128,128,128,.3))', borderRadius: 8, padding: multiline ? '7px 9px' : '5px 9px', background: 'var(--dsw-alias-bg-layer-2,transparent)', color: 'inherit', boxSizing: 'border-box', whiteSpace: multiline ? 'pre-wrap' : undefined }
+  return multiline
+    ? h('textarea', { value, placeholder: placeholder || '', spellCheck: false, rows: rows || 2, style: Object.assign({ resize: 'vertical' }, style), onChange: (e) => onChange(e.target.value) })
+    : h('input', { value, type: type || 'text', placeholder: placeholder || '', spellCheck: false, style, onChange: (e) => onChange(e.target.value) })
+}
+
+function FormSelect({ value, onChange, options }) {
+  return h('select', { value, onChange: (e) => onChange(e.target.value), style: { width: '100%', border: '1px solid var(--dsw-alias-border-l2,rgba(128,128,128,.3))', background: 'var(--dsw-alias-bg-layer-2,transparent)', color: 'inherit', borderRadius: 8, padding: '5px 8px', font: 'inherit', fontSize: 12.5 } },
+    options.map((o) => h('option', { key: o[0], value: o[0] }, o[1])))
+}
+
+// ── FormEditor 完整版重建（表单/YAML 子模式 + 乐观锁 + 级联校验）─────────
+function FormEditor({ state, controller, t }) {
+  const ed = state.editor
+  const [subMode, setSubMode] = useState('form')
+  const parsedData = useMemo(() => { try { return YAML.parse(ed.text) } catch { return null } }, [ed.text])
+  const p = parsedData && typeof parsedData === 'object' && parsedData.process ? parsedData.process : null
+  const phases = parsedData && Array.isArray(parsedData.phases) ? parsedData.phases : []
+
+  const setField = (path, value) => {
+    const doc = fmDoc(ed.text)
+    if (!doc) return
+    try { doc.setIn(path, value) } catch {}
+    controller.setEditorText(doc.toString())
+  }
+
+  return h('div', { className: 'dsh-prc-detail dsh-prc-editor' },
+    h('div', { className: 'dsh-prc-detail-head' },
+      h('h3', { className: 'dsh-prc-detail-title' }, (ed.mode === 'create' ? t('editorCreate') : t('editorTitle')) + (ed.name ? '：' + ed.name : '')),
+      h('div', { className: 'dsh-prc-actions' },
+        h('button', { className: 'dsh-prc-btn', onClick: () => controller.requestCloseEditor() }, t('cancel')))),
+    h('div', { className: 'dsh-prc-form' },
+      h('label', { className: 'dsh-prc-field' }, '显示名',
+        h('input', { value: String(p.display_name || ''), spellCheck: false,
+          onChange: function(e) { setField(['process', 'display_name'], e.target.value) },
+          style: { width: '100%', border: '1px solid var(--dsw-alias-border-l2,rgba(128,128,128,.3))', borderRadius: 8, padding: '6px 10px', fontSize: 13, background: 'var(--dsw-alias-bg-layer-2,transparent)', color: 'inherit', boxSizing: 'border-box' } })),
+      h('label', { className: 'dsh-prc-field' }, '复杂度',
+        h('select', { value: String(p.complexity || 'light'), onChange: function(e) { setField(['process', 'complexity'], e.target.value) },
+          style: { width: '100%', border: '1px solid var(--dsw-alias-border-l2,rgba(128,128,128,.3))', borderRadius: 8, padding: '6px 10px', fontSize: 13, background: 'var(--dsw-alias-bg-layer-2,transparent)', color: 'inherit' } },
+          ['light','lightweight','standard','medium','complex'].map(function(c) { return h('option', { key: c, value: c }, c) }))),
+      h('label', { className: 'dsh-prc-field' }, '分类',
+        h('input', { value: String(p.category || ''), spellCheck: false,
+          onChange: function(e) { setField(['process', 'category'], e.target.value) },
+          style: { width: '100%', border: '1px solid var(--dsw-alias-border-l2,rgba(128,128,128,.3))', borderRadius: 8, padding: '6px 10px', fontSize: 13, background: 'var(--dsw-alias-bg-layer-2,transparent)', color: 'inherit', boxSizing: 'border-box' } })),
+      h('label', { className: 'dsh-prc-field' }, '版本',
+        h('input', { value: String(p.version || ''), spellCheck: false,
+          onChange: function(e) { setField(['process', 'version'], e.target.value) },
+          style: { width: '100%', border: '1px solid var(--dsw-alias-border-l2,rgba(128,128,128,.3))', borderRadius: 8, padding: '6px 10px', fontSize: 13, background: 'var(--dsw-alias-bg-layer-2,transparent)', color: 'inherit', boxSizing: 'border-box' } }))))
+}
+
 function EditorPane({ state, controller, t }) {
   const ed = state.editor
   const taRef = useRef(null)
   const gutterRef = useRef(null)
+  // 子模式：'form'（可视化表单）| 'yaml'（YAML 文本）——同一份 ed.text 双向实时同步
+  const [subMode, setSubMode] = useState('form')
+  const docOk = useMemo(() => !!fmDoc(ed ? ed.text : ''), [ed && ed.text])
+  const mode = subMode === 'form' && !docOk ? 'yaml' : subMode
   if (!ed) return null
   const lines = ed.text.split('\n')
   const diag = ed.diagnostics || { errors: [], warnings: [] }
@@ -1231,6 +1452,9 @@ function EditorPane({ state, controller, t }) {
   return h('div', { className: 'dsh-prc-detail dsh-prc-editor' },
     h('div', { className: 'dsh-prc-detail-head' },
       h('h3', { className: 'dsh-prc-detail-title' }, (ed.mode === 'create' ? t('editorCreate') : t('editorTitle')) + (ed.name ? '：' + ed.name : '')),
+      h('div', { className: 'dsh-prc-tabs', style: { borderBottom: 'none', margin: '0 6px 0 0' } },
+        h('button', { className: 'dsh-prc-tab', 'data-on': mode === 'form' ? 'true' : undefined, onClick: () => setSubMode('form'), disabled: !docOk, title: !docOk ? t('formUnparseable') : undefined }, t('formMode')),
+        h('button', { className: 'dsh-prc-tab', 'data-on': mode === 'yaml' ? 'true' : undefined, onClick: () => setSubMode('yaml') }, t('yamlMode'))),
       h('div', { className: 'dsh-prc-actions' },
         ed.dirty ? h('span', { className: 'dsh-prc-badge', 'data-kind': 'warn' }, t('unsaved')) : null,
         h('button', { className: 'dsh-prc-btn', onClick: () => void controller.validateEditor(), disabled: ed.busy }, '✓ ' + t('validate')),
@@ -1241,13 +1465,15 @@ function EditorPane({ state, controller, t }) {
       h('button', { className: 'dsh-prc-btn', onClick: () => void controller.reloadEditor() }, t('reload')),
       h('button', { className: 'dsh-prc-btn', 'data-danger': 'true', onClick: () => void controller.saveEditor(true) }, t('overwrite'))) : null,
     ed.error ? h('div', { className: 'dsh-prc-error' }, ed.error) : null,
-    h('div', { className: 'dsh-prc-editor-wrap' },
-      h('div', { className: 'dsh-prc-gutter', ref: gutterRef }, lines.map((_, i) => h('div', { key: i }, i + 1))),
-      h('textarea', {
-        className: 'dsh-prc-textarea', ref: taRef, value: ed.text, spellCheck: false,
-        onChange: (e) => controller.setEditorText(e.target.value),
-        onScroll, onKeyDown,
-      })),
+    mode === 'form'
+      ? h(FormEditor, { state, controller, t, ed })
+      : h('div', { className: 'dsh-prc-editor-wrap' },
+        h('div', { className: 'dsh-prc-gutter', ref: gutterRef }, lines.map((_, i) => h('div', { key: i }, i + 1))),
+        h('textarea', {
+          className: 'dsh-prc-textarea', ref: taRef, value: ed.text, spellCheck: false,
+          onChange: (e) => controller.setEditorText(e.target.value),
+          onScroll, onKeyDown,
+        })),
     h('div', { className: 'dsh-prc-status' },
       h('span', null, t('linesCount', { n: lines.length })),
       ed.dirty ? null : h('span', null, t('saved')),

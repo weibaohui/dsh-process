@@ -11,7 +11,7 @@
  * Run: `npm run build:client`
  */
 
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync } from "node:fs"
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
@@ -32,6 +32,13 @@ try {
   const kitPath = createRequire(import.meta.url).resolve('@weibaohui/dsh-plugin-kit/client/source.js')
   kitSource = readFileSync(kitPath, 'utf8')
 } catch { /* kit 未安装：bundle 照常产出，消费者需保证不触发 PluginKit 分支 */ }
+
+// yaml 库内联（esbuild IIFE → var YamlLib，先 `npm i -D esbuild` 再跑
+// scripts/make-yaml-bundle.mjs 生成 yaml-bundle.js）：表单编辑的 Document API
+// 需要 yaml，loader 不提供该平台模块，因此构建期内联（+~250KB）。
+let yamlBundleText = ''
+const yamlBundlePath = join(here, "yaml-bundle.js")
+if (existsSync(yamlBundlePath)) yamlBundleText = readFileSync(yamlBundlePath, 'utf8')
 
 const banner = `/* Generated from client/index.js by scripts/build-client.mjs — do not edit by hand.
  * Regenerate with: npm run build:client
@@ -59,10 +66,16 @@ const kitIndented = kitSource === ''
   ? ''
   : kitSource.split('\n').map((line) => (line.length === 0 ? line : '    ' + line)).join('\n') + '\n'
 
+// yaml 打包体同样缩进注入 factory 顶部（最先执行）
+const yamlIndented = yamlBundleText === ''
+  ? ''
+  : yamlBundleText.split('\n').map((line) => (line.length === 0 ? line : '    ' + line)).join('\n') + '\n'
+
 const indented = source
   .split('\n')
   .map((line) => (line.length === 0 ? line : '    ' + line))
   .join('\n')
 
-writeFileSync(bundlePath, banner + kitIndented + indented + footer)
-console.log(`built ${bundlePath} (${Buffer.byteLength(banner + indented + footer, 'utf8')} bytes)`)
+const body = banner + yamlIndented + kitIndented + indented + footer
+writeFileSync(bundlePath, body)
+console.log(`built ${bundlePath} (${Buffer.byteLength(body, 'utf8')} bytes)`)
