@@ -1,6 +1,6 @@
 {
   "name": "@weibaohui/dsh-process",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "dsh 插件 · 工艺管理：把 ntd 的「工艺」（Process，多阶段·多环节 agent 工作流模板）接进 dsh web——浏览/编辑/校验/导入导出/AI 生成工艺，内置库只读、我的库可写，文件改动实时同步；agent 可通过 process_* 工具读工艺库、按工艺分阶段推进。",
   "license": "MIT",
   "main": "src/index.js",
@@ -49,7 +49,7 @@
     "yaml"
   ],
   "dependencies": {
-    "@weibaohui/dsh-plugin-kit": "^0.3.0",
+    "@weibaohui/dsh-plugin-kit": "0.3.1",
     "yaml": "^2.9.0"
   },
   "engines": {
