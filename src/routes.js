@@ -13,6 +13,8 @@
  * GET  /export?id= | ?all=1 | ?source=user   单 yaml / zip
  * GET  /skeleton?name=        新建空白骨架 yaml
  * GET|POST /settings          根目录与开关
+ * GET  /models                模型下拉目录 {default, providers[]}（llm 服务缺席降级空）
+ * GET  /skills                dsh 技能目录 {skills[]}（skills 服务缺席降级空）
  * GET  /events                SSE：hello{revision} / change{revision} / 25s 心跳
  * POST /ai-generate {prompt}  → {jobId}（kit 宿主执行器；服务缺席 503）
  * GET  /jobs?id=              {status, output, code, sessionId}
@@ -167,6 +169,36 @@ function registerRoutes(ctx, deps) {
           ? registry.list().map((w) => ({ id: w.id, title: w.title || w.path }))
           : []
         return sendJson(res, 200, { workspaces })
+      }
+      // GET /models — 模型下拉目录（llm.listProviders + 逐家 listModels；缺席降级空目录；dsh-kb 同款）
+      if (sub === '/models' && method === 'GET') {
+        const out = { default: null, providers: [] }
+        try {
+          if (ctx.agentDefaultModel && typeof ctx.agentDefaultModel.currentSelection === 'function')
+            out.default = ctx.agentDefaultModel.currentSelection()
+        } catch { }
+        try {
+          const providers = ctx.llm && typeof ctx.llm.listProviders === 'function' ? ctx.llm.listProviders() : []
+          for (const p of providers || []) {
+            let models = []
+            try { models = (await ctx.llm.listModels(p.id)) || [] } catch { }
+            out.providers.push({ id: p.id, name: p.name || p.id, models: models.map((m) => ({ id: m.id, name: m.name || m.id })) })
+          }
+        } catch { }
+        return sendJson(res, 200, out)
+      }
+      // GET /skills — dsh 技能目录（ctx.skills.snapshot；缺席降级空目录）
+      if (sub === '/skills' && method === 'GET') {
+        const out = []
+        try {
+          const snapshot = ctx.skills && typeof ctx.skills.snapshot === 'function' ? await ctx.skills.snapshot({}) : null
+          for (const s of (snapshot && snapshot.skills) || []) {
+            if (s.invocation && s.invocation.modelInvocable === false) continue
+            out.push({ name: String(s.name || ''), description: typeof s.description === 'string' ? s.description.slice(0, 120) : '' })
+          }
+        } catch (e) { logger && logger.warn && logger.warn(`dsh-process: skills snapshot: ${e && e.message}`) }
+        out.sort((a, b) => a.name.localeCompare(b.name))
+        return sendJson(res, 200, { skills: out })
       }
       if (sub === '/runs' && method === 'GET') {
         return sendJson(res, 200, { revision: runs.revision, runs: runs.list().map(runSummary) })

@@ -69,7 +69,7 @@ module.exports = {
   name: 'dsh-process',
   // 静态注入（系列惯例）：apply 在这些服务就绪后才运行。动态 ctx.inject(['settings'])
   // 在 apply 内不触发（hermes-loop 记录的平台坑），所以全部静态声明。
-  inject: ['webServer', 'tools', 'systemPrompt', 'settings', 'agents', 'agentDefaultModel', 'sessions', 'workspaceRegistry'],
+  inject: ['webServer', 'tools', 'systemPrompt', 'settings', 'agents', 'agentDefaultModel', 'sessions', 'workspaceRegistry', 'llm', 'skills'],
   __test: { defaultSettings, sanitizeSettings, expandHome },
 
   apply(ctx, rawConfig) {
