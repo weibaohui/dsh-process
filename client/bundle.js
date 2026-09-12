@@ -170,8 +170,8 @@ window.__ModuleLoader__.load({
      *
      * 三个挂载面：
      * - 侧栏入口行（DOM 注入「新会话」下方，与任务看板同一家族块；滚动数字 = 我的 | 内置）。
-     * - 主页面：官方 root 级 `shell.overlay` slot（列表+详情/编辑器全页工作台；侧栏保持可点；
-     *   Esc / 点会话行 / 与其他面板互斥时关闭）。
+     * - 主页面：官方 root 级 `shell.overlay` slot（列表+详情/编辑器工作台，全屏 overlay 盖住整个窗口，
+     *   知识库同款交互；Esc / 点会话行 / 与其他面板互斥时关闭）。
      * - 兜底：shell.overlay 未渲染的壳层组合下，开面板 450ms 自动改走中栏注入。
      *
      * 数据流：EventSource /dsh-process/events 变更帧 → 全量 refetch + revision 追赶
@@ -273,7 +273,12 @@ window.__ModuleLoader__.load({
       linkPending: '待跑', linkDone: '完成', linkRunning: '进行中', linkGateFailed: '门禁未过', linkSkipped: '跳过', linkFailed: '失败', linkAbandoned: '中断',
       currentStep: '当前', runError: '运行异常',
       runUserInput: '需求 / 要处理的问题（必填，会注入每个环节）', runUserInputPh: '例如：把「XX」这条口头需求整理成 PRD 并拆解任务',
-      formMode: '表单', yamlMode: 'YAML', formUnparseable: '当前 YAML 有语法错误，请切到 YAML 模式修复后再用表单',
+      formMode: '画布', yamlMode: 'YAML', formUnparseable: '当前 YAML 有语法错误，请切到 YAML 模式修复后再用画布',
+      canvasHint: '点击节点在右侧编辑属性；点空白处看工艺属性', canvasEmpty: '还没有任何阶段，点「＋ 添加阶段」开始',
+      propGlobal: '工艺属性', propPhase: '阶段属性', propLink: '环节属性',
+      canvasDelPhase: '删除阶段「{name}」及其下 {n} 个环节？', canvasDelLink: '删除环节「{name}」？',
+      formProvider: '供应商', modelDefault: '（默认）', modelProvDefault: '（供应商默认）',
+      skillsPick: '点选技能…', skillsNone: '无可用技能', skillsClear: '清空已选（{n}）',
       formBasic: '基本信息', formLimits: '限额', formPhases: '阶段', formAddPhase: '+ 添加阶段', formAddLink: '+ 添加环节',
       formDelPhase: '删除阶段', formDelLink: '删除环节', formAddGate: '+ 添加门禁', formGateName: '门禁名（如 产物存在）', formGateMin: '分数线',
       formName: '环节名', formGates: '门禁', formGateType: '门禁类型', formGateArtifact: '产物名',
@@ -357,7 +362,12 @@ window.__ModuleLoader__.load({
       linkPending: 'pending', linkDone: 'done', linkRunning: 'running', linkGateFailed: 'gate failed', linkSkipped: 'skipped', linkFailed: 'failed', linkAbandoned: 'abandoned',
       currentStep: 'current', runError: 'run error',
       runUserInput: 'Requirement / what to work on (required, injected into every link)', runUserInputPh: 'e.g. turn requirement XX into a PRD and split tasks',
-      formMode: 'Form', yamlMode: 'YAML', formUnparseable: 'YAML has syntax errors — fix them in YAML mode before using the form',
+      formMode: 'Canvas', yamlMode: 'YAML', formUnparseable: 'YAML has syntax errors — fix them in YAML mode before using the canvas',
+      canvasHint: 'Click a node to edit its properties on the right; click empty space for process properties', canvasEmpty: 'No phases yet — click "+ Add phase" to start',
+      propGlobal: 'Process properties', propPhase: 'Phase properties', propLink: 'Link properties',
+      canvasDelPhase: 'Delete phase "{name}" and its {n} link(s)?', canvasDelLink: 'Delete link "{name}"?',
+      formProvider: 'Provider', modelDefault: '(default)', modelProvDefault: '(provider default)',
+      skillsPick: 'Pick skills…', skillsNone: 'No skills available', skillsClear: 'Clear selection ({n})',
       formBasic: 'Basics', formLimits: 'Limits', formPhases: 'Phases', formAddPhase: '+ Add phase', formAddLink: '+ Add link',
       formDelPhase: 'Delete phase', formDelLink: 'Delete link', formAddGate: '+ Add gate', formGateName: 'Gate name (e.g. artifact exists)', formGateMin: 'Min score',
       formName: 'Link name', formGates: 'Gates', formGateType: 'Gate type', formGateArtifact: 'Artifact',
@@ -405,7 +415,7 @@ window.__ModuleLoader__.load({
     [data-sidebar-collapsed] [data-dsh-prc-entry] .dsh-prc-entry-label, [data-sidebar-collapsed] [data-dsh-prc-entry] .dsh-prc-entry-stats,
     [class*="_collapsed"] [data-dsh-prc-entry] .dsh-prc-entry-label, [class*="_collapsed"] [data-dsh-prc-entry] .dsh-prc-entry-stats { display:none; }
 
-    .dsh-prc-panel { position:absolute; top:0; bottom:0; right:0; display:flex; flex-direction:column; overflow:hidden; pointer-events:auto; background:var(--dsw-alias-bg-base, var(--dsw-bg, #fff)); color:var(--dsw-alias-label-primary, var(--dsw-text-primary, inherit)); font:var(--dsw-font-family, inherit); font-size:13px; z-index:1; }
+    .dsh-prc-panel { position:fixed; inset:0; display:flex; flex-direction:column; overflow:hidden; pointer-events:auto; background:var(--dsw-alias-bg-base, var(--dsw-bg, #fff)); color:var(--dsw-alias-label-primary, var(--dsw-text-primary, inherit)); font:var(--dsw-font-family, inherit); font-size:13px; z-index:1; }
     .dsh-prc-toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:10px 14px; border-bottom:1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.35)); background:var(--dsw-alias-bg-layer-1, transparent); }
     .dsh-prc-title { font-size:15px; font-weight:600; margin:0; }
     .dsh-prc-count { font-size:12px; color:var(--dsw-text-secondary, gray); }
@@ -530,6 +540,49 @@ window.__ModuleLoader__.load({
     .dsh-prc-flowlegend .sw.jump { border-color:#22c55e; }
     .dsh-prc-flowlegend .sw.fail { border-color:var(--dsw-alias-state-error, #ef4444); border-top-style:dashed; }
     .dsh-prc-form { flex:1; min-height:0; overflow-y:auto; padding:12px 16px; box-sizing:border-box; }
+    /* 画布编辑器：左画布（阶段泳道+环节节点）+ 右属性面板（ntd 同款交互） */
+    .dsh-prc-canvas { flex:1; min-height:0; display:flex; overflow:hidden; }
+    .dsh-prc-canvas-left { flex:1; min-width:0; overflow:auto; padding:14px; box-sizing:border-box; }
+    .dsh-prc-canvas-bar { display:flex; align-items:center; gap:10px; margin-bottom:12px; position:sticky; top:0; z-index:2; background:var(--dsw-alias-bg-base, inherit); padding:4px 0; }
+    .dsh-prc-canvas-hint { font-size:11px; opacity:.55; }
+    .dsh-prc-canvas-empty { border:1px dashed var(--dsw-alias-border-l2, rgba(128,128,128,.35)); border-radius:12px; padding:32px; text-align:center; opacity:.6; }
+    .dsh-prc-lane { border:1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.3)); border-radius:12px; margin:0 0 12px; background:var(--dsw-alias-bg-layer-1, transparent); overflow:hidden; }
+    .dsh-prc-lane[data-sel="true"] { border-color:var(--dsw-alias-brand-primary, #d9822b); box-shadow:0 0 0 1px var(--dsw-alias-brand-primary, #d9822b); }
+    .dsh-prc-lane-head { display:flex; align-items:center; gap:8px; padding:8px 12px; cursor:pointer; background:var(--dsw-alias-bg-layer-2, rgba(128,128,128,.06)); user-select:none; }
+    .dsh-prc-lane-no { color:#fff; font-size:10px; font-weight:700; border-radius:8px; padding:2px 7px; font-family:ui-monospace, monospace; }
+    .dsh-prc-lane-name { font-weight:600; font-size:13px; }
+    .dsh-prc-lane-id { font-family:ui-monospace, monospace; font-size:11px; opacity:.5; }
+    .dsh-prc-lane-count { margin-left:auto; font-size:11px; opacity:.55; }
+    .dsh-prc-lane-body { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:12px; }
+    .dsh-prc-node { border:1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.35)); border-radius:10px; padding:8px 12px; cursor:pointer; min-width:130px; max-width:210px; background:var(--dsw-alias-bg-base, transparent); user-select:none; }
+    .dsh-prc-node:hover { border-color:var(--dsw-alias-brand-primary, #d9822b); }
+    .dsh-prc-node[data-sel="true"] { border-color:var(--dsw-alias-brand-primary, #d9822b); box-shadow:0 0 0 1px var(--dsw-alias-brand-primary, #d9822b); }
+    .dsh-prc-node-name { font-weight:600; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .dsh-prc-node-meta { display:flex; gap:6px; align-items:center; margin-top:3px; }
+    .dsh-prc-node-id { font-family:ui-monospace, monospace; font-size:10.5px; opacity:.5; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .dsh-prc-node-badge { font-size:10.5px; color:#b8860b; white-space:nowrap; }
+    .dsh-prc-node-arrow { opacity:.45; font-size:14px; }
+    .dsh-prc-node-add { border:1px dashed var(--dsw-alias-border-l2, rgba(128,128,128,.4)); background:transparent; color:inherit; border-radius:10px; min-width:34px; height:38px; font-size:16px; cursor:pointer; opacity:.65; }
+    .dsh-prc-node-add:hover { opacity:1; border-color:var(--dsw-alias-brand-primary, #d9822b); }
+    .dsh-prc-props { width:400px; min-width:340px; flex:none; border-left:1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.3)); overflow-y:auto; padding:12px 16px; box-sizing:border-box; }
+    /* 模型两极下拉 + 技能多选下拉 */
+    .dsh-prc-modelrow { display:flex; gap:6px; }
+    .dsh-prc-native-sel { flex:1; min-width:0; border:1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.3)); background:var(--dsw-alias-bg-layer-2, transparent); color:inherit; border-radius:8px; padding:6px 8px; font:inherit; font-size:12.5px; }
+    .dsh-prc-native-sel:disabled { opacity:.45; }
+    .dsh-prc-selbtn { width:100%; display:flex; align-items:center; gap:6px; text-align:left; border:1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.3)); background:var(--dsw-alias-bg-layer-2, transparent); color:inherit; border-radius:8px; padding:6px 10px; font:inherit; font-size:12.5px; cursor:pointer; }
+    .dsh-prc-selbtn .dsh-prc-selph { opacity:.45; }
+    .dsh-prc-selbtn span:first-child { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .dsh-prc-selcar { opacity:.5; }
+    .dsh-prc-skillpick { position:relative; }
+    .dsh-prc-skillpop { position:absolute; left:0; right:0; top:calc(100% + 4px); z-index:30; background:var(--dsw-alias-bg-overlay, var(--dsw-alias-bg-layer-1, #252830)); color:var(--dsw-alias-label-primary, inherit); border:1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.3)); border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,.25); max-height:260px; overflow-y:auto; padding:4px; }
+    .dsh-prc-skillrow { display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; cursor:pointer; font-size:12.5px; }
+    .dsh-prc-skillrow:hover { background:var(--dsw-alias-bg-layer-2, rgba(128,128,128,.12)); }
+    .dsh-prc-skillrow input { flex:none; }
+    .dsh-prc-skillname { font-weight:600; white-space:nowrap; }
+    .dsh-prc-skilldesc { opacity:.55; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .dsh-prc-skillnone { padding:10px; opacity:.55; font-size:12px; text-align:center; }
+    .dsh-prc-skillclear { width:100%; border:none; border-top:1px solid var(--dsw-alias-border-l1, rgba(128,128,128,.2)); background:transparent; color:inherit; padding:7px; font:inherit; font-size:12px; cursor:pointer; opacity:.7; }
+    .dsh-prc-skillclear:hover { opacity:1; }
     .dsh-prc-fsec { margin:0 0 14px; }
     .dsh-prc-fsec h4 { margin:0 0 8px; font-size:13px; }
     .dsh-prc-fgrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:8px 12px; }
@@ -1577,8 +1630,83 @@ window.__ModuleLoader__.load({
         opts.map((o) => h('option', { key: o, value: o }, o)))
     }
 
+    // 模型目录 + 技能目录的模块级缓存（跨 form↔yaml 切换、跨编辑器开关复用，不设过期）
+    const catalogCache = { loaded: false, models: { providers: [] }, skills: [] }
+    // 画布选中态的模块级记忆：form↔yaml 切换重挂载后按 id 恢复（id 对不上自动回落 global）
+    let canvasSelMemory = { kind: 'global' }
+
+    /** 模型两极下拉：供应商 → 模型（不让手填）。YAML 值 = 'provider/model'；空 = 跟随运行模型。 */
+    function ModelPicker({ value, catalog, onChange, t }) {
+      const raw = String(value ?? '')
+      const slash = raw.indexOf('/')
+      const curProvider = slash >= 0 ? raw.slice(0, slash) : raw
+      const curModel = slash >= 0 ? raw.slice(slash + 1) : ''
+      const providers = (catalog.models && catalog.models.providers) || []
+      const prov = providers.find((p) => p.id === curProvider)
+      const models = prov ? prov.models : []
+      const opts = [h('option', { key: '', value: '' }, t('modelDefault'))].concat(
+        providers.map((p) => h('option', { key: p.id, value: p.id }, p.name)),
+        (curProvider && !prov) ? [h('option', { key: curProvider, value: curProvider }, curProvider)] : [])
+      const mopts = [h('option', { key: '', value: '' }, curProvider ? t('modelProvDefault') : t('modelDefault'))].concat(
+        models.map((m) => h('option', { key: m.id, value: m.id }, m.name)),
+        (curModel && (!prov || !models.some((m) => m.id === curModel))) ? [h('option', { key: curModel, value: curModel }, curModel)] : [])
+      return h('div', { className: 'dsh-prc-modelrow' },
+        h('select', {
+          className: 'dsh-prc-native-sel', value: curProvider, title: t('formProvider'),
+          onChange: (e) => { const p = e.target.value; onChange(p === '' ? null : (models.some((m) => m.id === curModel) ? p + '/' + curModel : p)) },
+        }, opts),
+        h('select', {
+          className: 'dsh-prc-native-sel', value: curModel, title: '模型', disabled: curProvider === '',
+          onChange: (e) => { const m = e.target.value; onChange(curProvider === '' ? null : (m === '' ? curProvider : curProvider + '/' + m)) },
+        }, mopts))
+    }
+
+    /** 技能多选下拉：dsh 技能目录（/skills），勾选写回 skills 数组。 */
+    function SkillPicker({ value, skills, onChange, t }) {
+      const [open, setOpen] = useState(false)
+      const wrapRef = useRef(null)
+      useEffect(() => {
+        if (!open) return undefined
+        const onDown = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false) }
+        document.addEventListener('mousedown', onDown)
+        return () => document.removeEventListener('mousedown', onDown)
+      }, [open])
+      const arr = Array.isArray(value) ? value.map(String)
+        : (value && Array.isArray(value.items)) ? value.items.map((n) => String(n && n.value !== undefined ? n.value : n))
+          : []
+      const toggle = (name) => onChange(arr.includes(name) ? arr.filter((x) => x !== name) : arr.concat(name))
+      return h('div', { className: 'dsh-prc-skillpick', ref: wrapRef },
+        h('button', { type: 'button', className: 'dsh-prc-selbtn', onClick: () => setOpen(!open), 'data-open': open ? 'true' : undefined },
+          h('span', { className: arr.length ? '' : 'dsh-prc-selph' }, arr.length ? arr.join(', ') : t('skillsPick')),
+          h('span', { className: 'dsh-prc-selcar' }, open ? '▴' : '▾')),
+        !open ? null : h('div', { className: 'dsh-prc-skillpop' },
+          (!skills || skills.length === 0) ? h('div', { className: 'dsh-prc-skillnone' }, t('skillsNone')) :
+            skills.map((s) => h('label', { key: s.name, className: 'dsh-prc-skillrow' },
+              h('input', { type: 'checkbox', checked: arr.includes(s.name), onChange: () => toggle(s.name) }),
+              h('span', { className: 'dsh-prc-skillname' }, s.name),
+              s.description ? h('span', { className: 'dsh-prc-skilldesc', title: s.description }, s.description) : null)),
+          arr.length ? h('button', { type: 'button', className: 'dsh-prc-skillclear', onClick: () => onChange([]) }, t('skillsClear', { n: arr.length })) : null))
+    }
+
     function FormEditor({ state, controller, t, ed }) {
       const doc = useMemo(() => fmDoc(ed.text), [ed.text])
+      // 画布选中态：{kind:'global'} | {kind:'phase', id} | {kind:'link', id}。
+      // 只存 id：编辑导致索引漂移时按 id 重扫，找不到（刚删掉）回落 global。
+      const [sel, setSelState] = useState(() => canvasSelMemory)
+      const setSel = (s) => { canvasSelMemory = s; setSelState(s) }
+      // 模型目录 + dsh 技能目录（模块级缓存，编辑器每次挂载只拉一次）
+      const [catalog, setCatalog] = useState(() => catalogCache)
+      useEffect(() => {
+        if (catalogCache.loaded) return
+        let live = true
+        Promise.all([api('/models').catch(() => null), api('/skills').catch(() => null)]).then(([m, s]) => {
+          catalogCache.models = m || { providers: [] }
+          catalogCache.skills = s && Array.isArray(s.skills) ? s.skills : []
+          catalogCache.loaded = true
+          if (live) setCatalog({ ...catalogCache })
+        })
+        return () => { live = false }
+      }, [])
       if (!doc) {
         return h('div', { className: 'dsh-prc-form' },
           h('div', { className: 'dsh-prc-error' }, t('formUnparseable')))
@@ -1586,7 +1714,6 @@ window.__ModuleLoader__.load({
       const P = (path, dflt) => { const v = doc.getIn(path); return v === undefined || v === null ? dflt : v }
       const set = (path, value) => controller.setEditorText(fmSet(ed.text, path, value))
 
-      // 全库环节 id（流转目标下拉用）
       const phaseCount = fmSeqLen(doc, ['phases'])
       const allLinkIds = []
       for (let pi = 0; pi < phaseCount; pi++) {
@@ -1598,11 +1725,27 @@ window.__ModuleLoader__.load({
       }
       const flowOptions = (fixed) => fixed.concat(allLinkIds.map((id) => 'goto:' + id)).concat(allLinkIds)
 
+      // ── 选中解析：按 id 重扫定位索引 ──
+      const linkIdAt = (pi, li) => String(P(['phases', pi, 'links', li, 'id'], '') || '')
+      const phaseIdAt = (pi) => String(P(['phases', pi, 'id'], '') || '')
+      const R = (() => {
+        if (sel.kind === 'global') return { kind: 'global' }
+        for (let pi = 0; pi < phaseCount; pi++) {
+          if (sel.kind === 'phase' && phaseIdAt(pi) === sel.id) return { kind: 'phase', pi }
+          const lc = fmSeqLen(doc, ['phases', pi, 'links'])
+          for (let li = 0; li < lc; li++) {
+            if (sel.kind === 'link' && linkIdAt(pi, li) === sel.id) return { kind: 'link', pi, li }
+          }
+        }
+        return { kind: 'global' }
+      })()
+
       const addPhase = () => {
         let n = phaseCount + 1
         let pid = 'phase-' + n
         while (allLinkIds.some((id) => id.startsWith(pid))) { n += 1; pid = 'phase-' + n }
         controller.setEditorText(fmAppend(ed.text, ['phases'], { id: pid, name: '', spec: '', links: [] }))
+        setSel({ kind: 'phase', id: pid })
       }
       const addLink = (pi) => {
         let n = allLinkIds.length + 1
@@ -1613,27 +1756,113 @@ window.__ModuleLoader__.load({
           model: null, review_type: 'ai', gates: [], on_success: 'next', on_gate_fail: 'break',
           on_rating_fail: 'break', max_rework: null,
         }))
+        setSel({ kind: 'link', id: lid })
       }
-      const setSkills = (pi, li, text) => {
-        const arr = text.split(/[,，]/).map((s) => s.trim()).filter((s) => s !== '')
-        controller.setEditorText(fmSet(ed.text, ['phases', pi, 'links', li, 'skills'], arr))
+      const delPhase = (pi) => {
+        const name = String(P(['phases', pi, 'name'], '') || phaseIdAt(pi) || '#' + (pi + 1))
+        const n = fmSeqLen(doc, ['phases', pi, 'links'])
+        if (!window.confirm(t('canvasDelPhase', { name, n }))) return
+        controller.setEditorText(fmDeletePhase(ed.text, pi))
+        setSel({ kind: 'global' })
+      }
+      const delLink = (pi, li) => {
+        const name = String(P(['phases', pi, 'links', li, 'name'], '') || linkIdAt(pi, li))
+        if (!window.confirm(t('canvasDelLink', { name }))) return
+        controller.setEditorText(fmDeleteLink(ed.text, pi, li))
+        setSel({ kind: 'global' })
       }
 
+      // ── 左：画布 ──
+      const lane = (pi) => {
+        const pid = phaseIdAt(pi)
+        const pname = String(P(['phases', pi, 'name'], '') || pid)
+        const lc = fmSeqLen(doc, ['phases', pi, 'links'])
+        const phaseSel = R.kind === 'phase' && R.pi === pi
+        const chipKids = []
+        for (let li = 0; li < lc; li++) {
+          const lid = linkIdAt(pi, li)
+          const lname = String(P(['phases', pi, 'links', li, 'name'], '') || lid)
+          const gateCount = fmSeqLen(doc, ['phases', pi, 'links', li, 'gates'])
+          const isSel = R.kind === 'link' && R.pi === pi && R.li === li
+          if (li > 0) chipKids.push(h('span', { className: 'dsh-prc-node-arrow', key: 'ar' + li }, '→'))
+          chipKids.push(h('div', {
+            key: 'nd' + li, className: 'dsh-prc-node', 'data-sel': isSel ? 'true' : undefined,
+            onClick: (e) => { e.stopPropagation(); setSel({ kind: 'link', id: lid }) },
+          },
+            h('div', { className: 'dsh-prc-node-name' }, lname),
+            h('div', { className: 'dsh-prc-node-meta' },
+              h('span', { className: 'dsh-prc-node-id' }, lid),
+              gateCount > 0 ? h('span', { className: 'dsh-prc-node-badge' }, '🔒' + gateCount) : null)),
+          )
+        }
+        chipKids.push(h('button', {
+          key: 'addlk', className: 'dsh-prc-node-add', title: t('formAddLink'),
+          onClick: (e) => { e.stopPropagation(); addLink(pi) },
+        }, '＋'))
+        return h('div', { className: 'dsh-prc-lane', key: 'ph' + pi, 'data-sel': phaseSel ? 'true' : undefined },
+          h('div', { className: 'dsh-prc-lane-head', onClick: () => setSel({ kind: 'phase', id: pid }) },
+            h('span', { className: 'dsh-prc-lane-no', style: { background: flowPhaseColor(pid) } }, '#' + (pi + 1)),
+            h('span', { className: 'dsh-prc-lane-name' }, pname),
+            h('span', { className: 'dsh-prc-lane-id' }, pid),
+            h('span', { className: 'dsh-prc-lane-count' }, lc + t('links'))),
+          h('div', { className: 'dsh-prc-lane-body' }, chipKids))
+      }
+
+      const laneKids = []
+      for (let pi = 0; pi < phaseCount; pi++) laneKids.push(lane(pi))
+
+      const canvas = h('div', {
+        className: 'dsh-prc-canvas-left',
+        onClick: (e) => { if (e.target === e.currentTarget) setSel({ kind: 'global' }) },
+      },
+        h('div', { className: 'dsh-prc-canvas-bar' },
+          h('button', { className: 'dsh-prc-btn', 'data-primary': 'true', onClick: addPhase }, t('formAddPhase')),
+          h('span', { className: 'dsh-prc-canvas-hint' }, t('canvasHint'))),
+        phaseCount === 0 ? h('div', { className: 'dsh-prc-canvas-empty' }, t('canvasEmpty')) : null,
+        h('div', null, laneKids))
+
+      // ── 右：属性面板 ──
       const sec = (title, extra) => h('div', { className: 'dsh-prc-fsec' },
         h('h4', null, title), extra || null)
 
-      // ── 环节卡片 ──
-      const linkCard = (pi, li) => {
+      const propsGlobal = [
+        sec(t('propGlobal')),
+        h('div', { className: 'dsh-prc-fsec', key: 'basic' },
+          h('div', { className: 'dsh-prc-fgrid' },
+            h(FormField, { label: t('formDisplayName') }, h(FormText, { value: P(['process', 'display_name'], ''), onChange: (v) => set(['process', 'display_name'], v) })),
+            h(FormField, { label: t('formVersion') }, h(FormText, { value: P(['process', 'version'], ''), onChange: (v) => set(['process', 'version'], v) })),
+            h(FormField, { label: t('formCategory') }, h(FormText, { value: P(['process', 'category'], ''), onChange: (v) => set(['process', 'category'], v) })),
+            h(FormField, { label: t('formComplexity') }, h(FormSelect, { value: P(['process', 'complexity'], 'light'), options: ['light', 'lightweight', 'standard', 'medium', 'complex'], onChange: (v) => set(['process', 'complexity'], v) }))),
+          h('div', { style: { height: 8 } }),
+          h(FormField, { label: t('formDescription') }, h(FormArea, { value: P(['process', 'description'], ''), rows: 5, onChange: (v) => set(['process', 'description'], v) }))),
+        sec(t('formLimits')),
+        h('div', { className: 'dsh-prc-fsec', key: 'limits' },
+          h('div', { className: 'dsh-prc-fgrid' },
+            h(FormField, { label: t('formMaxSteps') }, h(FormNum, { value: P(['limits', 'max_step_executions'], null), min: 1, onChange: (v) => set(['limits', 'max_step_executions'], v) })),
+            h(FormField, { label: t('formMaxTokens') }, h(FormNum, { value: P(['limits', 'max_total_tokens'], null), min: 1, onChange: (v) => set(['limits', 'max_total_tokens'], v) }))))
+      ]
+
+      const propsPhase = (pi) => [
+        sec(t('propPhase') + ' · #' + (pi + 1),
+          h('button', { className: 'dsh-prc-btn', 'data-danger': 'true', style: { marginLeft: 'auto' }, onClick: () => delPhase(pi) }, t('formDelPhase'))),
+        h('div', { className: 'dsh-prc-fsec', key: 'meta' },
+          h('div', { className: 'dsh-prc-fgrid' },
+            h(FormField, { label: 'id' }, h(FormText, { value: phaseIdAt(pi), mono: true, onChange: (v) => { if (v.trim() !== '') set(['phases', pi, 'id'], v.trim()) } })),
+            h(FormField, { label: t('formPhaseName') }, h(FormText, { value: P(['phases', pi, 'name'], ''), placeholder: t('formPhaseName'), onChange: (v) => set(['phases', pi, 'name'], v) }))),
+          h(FormField, { label: t('formPhaseSpec'), style: { marginTop: 6 } }, h(FormArea, { value: P(['phases', pi, 'spec'], ''), rows: 4, onChange: (v) => set(['phases', pi, 'spec'], v) })))
+      ]
+
+      const propsLink = (pi, li) => {
         const lp = ['phases', pi, 'links', li]
         const gatesPath = [...lp, 'gates']
         const gateCount = fmSeqLen(doc, gatesPath)
         const metaFields = [
           ['id', 'id', true], [t('formName'), 'name', false], [t('formExecutor'), 'executor', false],
-          [t('formExpert'), 'expert', false], [t('formModel'), 'model', false],
+          [t('formExpert'), 'expert', false],
         ]
         const gridKids = metaFields.map(([label, key, mono], i) => h(FormField, { label, key: 'm' + i },
           h(FormText, {
-            value: key === 'id' ? String(P([...lp, 'id'], '')) : P([...lp, key], ''),
+            value: key === 'id' ? linkIdAt(pi, li) : P([...lp, key], ''),
             mono,
             placeholder: key === 'id' ? 'req-01' : undefined,
             onChange: (v) => {
@@ -1641,14 +1870,12 @@ window.__ModuleLoader__.load({
               else set([...lp, key], v === '' ? null : v)
             },
           })))
+        gridKids.push(h(FormField, { label: t('formModel'), key: 'model' },
+          h(ModelPicker, { value: P([...lp, 'model'], null), catalog, onChange: (v) => set([...lp, 'model'], v), t })))
         gridKids.push(h(FormField, { label: t('formReviewType'), key: 'rt' },
           h(FormSelect, { value: P([...lp, 'review_type'], 'ai'), options: ['ai', 'human', 'none'], onChange: (v) => set([...lp, 'review_type'], v) })))
-        // getIn 对序列返回 YAMLSeq 节点而非数组——展示前解包 items
-        const skillsText = (v) => Array.isArray(v) ? v.join(', ')
-          : (v && Array.isArray(v.items)) ? v.items.map((n) => String(n && n.value !== undefined ? n.value : n)).join(', ')
-          : String(v ?? '')
         gridKids.push(h(FormField, { label: t('formSkillsPh'), key: 'sk' },
-          h(FormText, { value: skillsText(P([...lp, 'skills'], [])), placeholder: t('formSkillsPh'), onChange: (v) => setSkills(pi, li, v) })))
+          h(SkillPicker, { value: P([...lp, 'skills'], []), skills: catalog.skills, onChange: (v) => set([...lp, 'skills'], v), t })))
         gridKids.push(h(FormField, { label: t('formMaxRework'), key: 'mr' },
           h(FormNum, { value: P([...lp, 'max_rework'], null), min: 0, onChange: (v) => set([...lp, 'max_rework'], v) })))
 
@@ -1666,71 +1893,39 @@ window.__ModuleLoader__.load({
             h('button', { className: 'dsh-prc-btn', 'data-danger': 'true', onClick: () => controller.setEditorText(fmDel(ed.text, gp)) }, '✕')))
         }
 
-        const kids = []
-        kids.push(h('div', { className: 'dsh-prc-fgrid', key: 'meta' }, gridKids))
-        kids.push(h(FormField, { label: t('formPrompt'), key: 'prompt' },
-          h(FormArea, { value: P([...lp, 'prompt'], ''), rows: 4, onChange: (v) => set([...lp, 'prompt'], v) })))
-        kids.push(h(FormField, { label: t('formAcceptance'), key: 'acc' },
-          h(FormArea, { value: P([...lp, 'acceptance_criteria'], ''), rows: 2, onChange: (v) => set([...lp, 'acceptance_criteria'], v) })))
-        kids.push(h('div', { className: 'dsh-prc-fgrid', style: { marginTop: 6 }, key: 'flow' },
-          h(FormField, { label: t('formOnSuccess') }, h(FormSelect, { value: P([...lp, 'on_success'], 'next'), options: flowOptions(['next', 'end']), onChange: (v) => set([...lp, 'on_success'], v) })),
-          h(FormField, { label: t('formOnGateFail') }, h(FormSelect, { value: P([...lp, 'on_gate_fail'], 'break'), options: flowOptions(['break']), onChange: (v) => set([...lp, 'on_gate_fail'], v) })),
-          h(FormField, { label: t('formOnRatingFail') }, h(FormSelect, { value: P([...lp, 'on_rating_fail'], 'break'), options: flowOptions(['break', 'next']), onChange: (v) => set([...lp, 'on_rating_fail'], v) }))))
-        kids.push(h('div', { style: { fontSize: 11, opacity: .55, margin: '2px 0 4px' }, key: 'idhint' }, t('formIdHint')))
-        kids.push(h('div', { className: 'dsh-prc-fgates', key: 'gates' }, gateKids))
-        kids.push(h('div', { style: { marginTop: 8, textAlign: 'right' }, key: 'dellk' },
-          h('button', { className: 'dsh-prc-btn', 'data-danger': 'true', onClick: () => controller.setEditorText(fmDeleteLink(ed.text, pi, li)) }, t('formDelLink'))))
-        return h('div', { className: 'dsh-prc-flink', key: 'lk' + pi + '-' + li }, kids)
+        return [
+          sec(t('propLink'),
+            h('button', { className: 'dsh-prc-btn', 'data-danger': 'true', style: { marginLeft: 'auto' }, onClick: () => delLink(pi, li) }, t('formDelLink'))),
+          h('div', { className: 'dsh-prc-fgrid', key: 'meta' }, gridKids),
+          h(FormField, { label: t('formPrompt'), key: 'prompt' },
+            h(FormArea, { value: P([...lp, 'prompt'], ''), rows: 6, onChange: (v) => set([...lp, 'prompt'], v) })),
+          h(FormField, { label: t('formAcceptance'), key: 'acc' },
+            h(FormArea, { value: P([...lp, 'acceptance_criteria'], ''), rows: 2, onChange: (v) => set([...lp, 'acceptance_criteria'], v) })),
+          h('div', { className: 'dsh-prc-fgrid', style: { marginTop: 6 }, key: 'flow' },
+            h(FormField, { label: t('formOnSuccess') }, h(FormSelect, { value: P([...lp, 'on_success'], 'next'), options: flowOptions(['next', 'end']), onChange: (v) => set([...lp, 'on_success'], v) })),
+            h(FormField, { label: t('formOnGateFail') }, h(FormSelect, { value: P([...lp, 'on_gate_fail'], 'break'), options: flowOptions(['break']), onChange: (v) => set([...lp, 'on_gate_fail'], v) })),
+            h(FormField, { label: t('formOnRatingFail') }, h(FormSelect, { value: P([...lp, 'on_rating_fail'], 'break'), options: flowOptions(['break', 'next']), onChange: (v) => set([...lp, 'on_rating_fail'], v) }))),
+          h('div', { style: { fontSize: 11, opacity: .55, margin: '2px 0 4px' }, key: 'idhint' }, t('formIdHint')),
+          h('div', { className: 'dsh-prc-fgates', key: 'gates' }, gateKids),
+        ]
       }
 
-      // ── 阶段卡片 ──
-      const phaseCard = (pi) => {
-        const linkCount = fmSeqLen(doc, ['phases', pi, 'links'])
-        const kids = []
-        kids.push(h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }, key: 'hd' },
-          h('span', { style: { fontSize: 12, opacity: .65 } }, '#' + (pi + 1)),
-          h('div', { className: 'dsh-prc-field', style: { flex: 1 } },
-            h(FormText, { value: P(['phases', pi, 'name'], ''), placeholder: t('formPhaseName'), onChange: (v) => set(['phases', pi, 'name'], v) })),
-          h('button', { className: 'dsh-prc-btn', 'data-danger': 'true', onClick: () => controller.setEditorText(fmDeletePhase(ed.text, pi)) }, t('formDelPhase'))))
-        kids.push(h(FormField, { label: t('formPhaseSpec'), key: 'spec' },
-          h(FormArea, { value: P(['phases', pi, 'spec'], ''), rows: 2, onChange: (v) => set(['phases', pi, 'spec'], v) })))
-        for (let li = 0; li < linkCount; li++) kids.push(linkCard(pi, li))
-        kids.push(h('div', { style: { marginTop: 6 }, key: 'addlk' },
-          h('button', { className: 'dsh-prc-btn', onClick: () => addLink(pi) }, t('formAddLink'))))
-        return h('div', { className: 'dsh-prc-fphase', key: 'ph' + pi }, kids)
-      }
+      const propsKids = R.kind === 'phase' ? propsPhase(R.pi)
+        : R.kind === 'link' ? propsLink(R.pi, R.li)
+          : propsGlobal
 
-      const phaseKids = []
-      for (let pi = 0; pi < phaseCount; pi++) phaseKids.push(phaseCard(pi))
-
-      return h('div', { className: 'dsh-prc-form' },
-        sec(t('formBasic')),
-        h('div', { className: 'dsh-prc-fsec' },
-          h('div', { className: 'dsh-prc-fgrid' },
-            h(FormField, { label: t('formDisplayName') }, h(FormText, { value: P(['process', 'display_name'], ''), onChange: (v) => set(['process', 'display_name'], v) })),
-            h(FormField, { label: t('formVersion') }, h(FormText, { value: P(['process', 'version'], ''), onChange: (v) => set(['process', 'version'], v) })),
-            h(FormField, { label: t('formCategory') }, h(FormText, { value: P(['process', 'category'], ''), onChange: (v) => set(['process', 'category'], v) })),
-            h(FormField, { label: t('formComplexity') }, h(FormSelect, { value: P(['process', 'complexity'], 'light'), options: ['light', 'lightweight', 'standard', 'medium', 'complex'], onChange: (v) => set(['process', 'complexity'], v) }))),
-          h('div', { style: { height: 8 } }),
-          h(FormField, { label: t('formDescription') }, h(FormArea, { value: P(['process', 'description'], ''), rows: 3, onChange: (v) => set(['process', 'description'], v) }))),
-        sec(t('formLimits')),
-        h('div', { className: 'dsh-prc-fsec' },
-          h('div', { className: 'dsh-prc-fgrid' },
-            h(FormField, { label: t('formMaxSteps') }, h(FormNum, { value: P(['limits', 'max_step_executions'], null), min: 1, onChange: (v) => set(['limits', 'max_step_executions'], v) })),
-            h(FormField, { label: t('formMaxTokens') }, h(FormNum, { value: P(['limits', 'max_total_tokens'], null), min: 1, onChange: (v) => set(['limits', 'max_total_tokens'], v) }))),
-          h('div', { style: { height: 8 } })),
-        sec(t('formPhases') + '（' + phaseCount + '）',
-          h('button', { className: 'dsh-prc-btn', style: { marginLeft: 'auto' }, onClick: addPhase }, t('formAddPhase'))),
-        phaseCount === 0 ? h('div', { style: { opacity: .6, fontSize: 12 } }, '—') : null,
-        h('div', null, phaseKids))
+      return h('div', { className: 'dsh-prc-canvas' },
+        canvas,
+        h('div', { className: 'dsh-prc-props' }, propsKids))
     }
+
 
     function EditorPane({ state, controller, t }) {
       const ed = state.editor
       const taRef = useRef(null)
       const gutterRef = useRef(null)
-      // 子模式：'form'（可视化表单）| 'yaml'（YAML 文本）——同一份 ed.text 双向实时同步
-      const [subMode, setSubMode] = useState('yaml')
+      // 子模式：'form'（画布：左节点图+右属性面板，ntd 同款）| 'yaml'（YAML 文本）——同一份 ed.text 双向实时同步
+      const [subMode, setSubMode] = useState('form')
       const docOk = useMemo(() => !!fmDoc(ed ? ed.text : ''), [ed && ed.text])
       const mode = subMode === 'form' && !docOk ? 'yaml' : subMode
       if (!ed) return null
@@ -2016,18 +2211,6 @@ window.__ModuleLoader__.load({
 
     function ProcessPanel({ controller, t, slotProps }) {
       const state = useControllerState(controller)
-      const [left, setLeft] = useState(280)
-      useEffect(() => {
-        const update = () => {
-          const col = document.querySelector('[class*="sidebarCol"], [data-pane="sidebar"]')
-          if (col) setLeft(Math.max(0, col.getBoundingClientRect().width))
-        }
-        update()
-        let ro
-        try { ro = new ResizeObserver(update); const col = document.querySelector('[class*="sidebarCol"], [data-pane="sidebar"]'); if (col) ro.observe(col) } catch {}
-        window.addEventListener('resize', update)
-        return () => { if (ro) try { ro.disconnect() } catch {} ; window.removeEventListener('resize', update) }
-      }, [])
       // 当前会话变化（点侧栏会话行/新会话）→ 关面板
       const useSess = slotProps && slotProps.useSessions
       const current = useSess ? useSess((s) => s.current) : undefined
@@ -2050,15 +2233,9 @@ window.__ModuleLoader__.load({
         document.addEventListener('keydown', onKey)
         return () => document.removeEventListener('keydown', onKey)
       }, [state.panelOpen])
-      // 面板打开时重新量一次侧栏宽（侧栏节点可能已被重建）
-      useEffect(() => {
-        if (!state.panelOpen) return
-        const col = document.querySelector('[class*="sidebarCol"], [data-pane="sidebar"]')
-        if (col) setLeft(Math.max(0, col.getBoundingClientRect().width))
-      }, [state.panelOpen])
       if (!state.panelOpen) return null
       const detail = state.editor ? h(EditorPane, { state, controller, t }) : h(DetailPane, { state, controller, t })
-      return h('div', { className: 'dsh-prc-panel', style: { left: left + 'px' }, 'data-dsh-prc-panel': '' },
+      return h('div', { className: 'dsh-prc-panel', 'data-dsh-prc-panel': '' },
         h(Toolbar, { state, controller, t }),
         state.error ? h('div', { className: 'dsh-prc-error' }, state.error) : null,
         state.lastError ? h('div', { className: 'dsh-prc-error' }, 'store: ' + state.lastError) : null,
