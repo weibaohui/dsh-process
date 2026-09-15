@@ -24,6 +24,10 @@
     "README.md",
     "LICENSE"
   ],
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.1.2-rc.1"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -51,9 +55,6 @@
   "dependencies": {
     "@weibaohui/dsh-plugin-kit": "0.3.1",
     "yaml": "^2.9.0"
-  },
-  "engines": {
-    "node": ">=20"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"
