@@ -18,10 +18,11 @@ const { makeAttempt, parseFlow, indexLinks, nextLinkAfter, firstLinkId, runSumma
 
 const OUTPUT_TAIL_CAP = 8 * 1024
 
-/** 会话事件列表：0.1.2-rc.1 起是 session.log（数组），旧版是 session.events。 */
+/** 会话事件列表：0.1.5 起 snapshotEvents()（events 属性移除）；更早是 session.log / session.events 数组。 */
 function sessionEventList(agent) {
   try {
     const ses = agent && agent.session
+    if (ses && typeof ses.snapshotEvents === 'function') return ses.snapshotEvents() || []
     if (Array.isArray(ses && ses.log)) return ses.log
     if (Array.isArray(ses && ses.events)) return ses.events
   } catch { /* 会话对象缺席 */ }
