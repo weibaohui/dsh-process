@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { RunStore, parseFlow, nextLinkAfter, firstLinkId, indexLinks } from '../src/runs.js'
-import { ExecutionService, parseJudgeOutput } from '../src/execution.js'
+import { RunStore, parseFlow, nextLinkAfter, firstLinkId, indexLinks, deriveRunName, runSummary } from '../src/runs.js'
+import { ExecutionService, parseJudgeOutput, sumUsage, addUsage } from '../src/execution.js'
 
 const SNAP = {
   limits: {},
@@ -41,6 +41,37 @@ test('parseJudgeOutput: fenced / raw / garbage', () => {
   assert.deepEqual(parseJudgeOutput('```json\n{"score": 82, "reason": "ok"}\n```'), { score: 82, reason: 'ok' })
   assert.equal(parseJudgeOutput('结论 {"score": 120, "reason": "x"} 完').score, 100) // 钳到 100
   assert.deepEqual(parseJudgeOutput('完全无法解析'), { score: 0, reason: '评审输出无法解析，按不通过处理' })
+})
+
+test('sumUsage：assistant/message.usage 逐步累加，无记录返回 undefined；addUsage 合并', () => {
+  const agent = { session: { events: [
+    { seq: 1, type: 'assistant/message', data: { message: { role: 'assistant' }, usage: { inputTokens: 100, outputTokens: 20 } } },
+    { seq: 2, type: 'tool/call', data: { name: 'bash' } },
+    { seq: 3, type: 'assistant/message', data: { message: { role: 'assistant' }, usage: { inputTokens: 50, outputTokens: 30, totalTokens: 90 } } },
+  ] } }
+  assert.deepEqual(sumUsage(agent, 0), { inputTokens: 150, outputTokens: 50, totalTokens: 90, calls: 2 })
+  assert.equal(sumUsage(agent, 3).inputTokens, 50) // firstSeq 过滤早期事件
+  assert.equal(sumUsage({ session: { events: [{ seq: 1, type: 'tool/call', data: {} }] } }, 0), undefined)
+  assert.deepEqual(addUsage(undefined, { inputTokens: 1, outputTokens: 2, totalTokens: 3, calls: 1 }),
+    { inputTokens: 1, outputTokens: 2, totalTokens: 3, calls: 1 })
+  assert.deepEqual(addUsage({ inputTokens: 1, outputTokens: 2, totalTokens: 3, calls: 1 }, { inputTokens: 10, outputTokens: 20, totalTokens: 30, calls: 2 }),
+    { inputTokens: 11, outputTokens: 22, totalTokens: 33, calls: 3 })
+})
+
+test('deriveRunName：需求首行摘要（不带工艺名），超长截断，空需求退回工艺名', () => {
+  assert.equal(deriveRunName({ displayName: 'X 工艺', processName: 'x', userInput: '修复登录页白屏\n附截图' }), '修复登录页白屏')
+  assert.equal(deriveRunName({ displayName: 'X 工艺', processName: 'x', userInput: '字'.repeat(40) }), '字'.repeat(24) + '…')
+  assert.equal(deriveRunName({ displayName: 'X 工艺', processName: 'x', userInput: '   ' }), 'X 工艺') // 空需求退回工艺名
+  assert.equal(deriveRunName({ processName: 'x' }), 'x') // 无 displayName 也无需求
+})
+
+test('runSummary.runName：新运行带需求摘要，旧台账回退工艺名', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'dsh-prc-name-'))
+  const runs = new RunStore(join(dir, 'runs.json'), console)
+  const run = runs.create({ processId: 'user:x.yaml', processName: 'x', displayName: 'X 工艺', snapshotYaml: '', snapshot: SNAP, userInput: '修复登录页白屏' })
+  assert.equal(runSummary(run).runName, '修复登录页白屏')
+  delete run.runName // 模拟旧版本台账里没有 runName 的记录
+  assert.equal(runSummary(run).runName, 'X 工艺')
 })
 
 /** 假宿主：agents.create 依序吐出预置回复的 agent。 */

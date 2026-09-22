@@ -15,6 +15,7 @@
 
 const { randomUUID } = require('node:crypto')
 const { makeAttempt, parseFlow, indexLinks, nextLinkAfter, firstLinkId, runSummary } = require('./runs.js')
+const { collectWriteOps, resolveArtifactEntries } = require('./artifacts.js')
 
 const OUTPUT_TAIL_CAP = 8 * 1024
 
@@ -49,6 +50,39 @@ function parseJudgeOutput(text) {
     }
   }
   return { score: 0, reason: '评审输出无法解析，按不通过处理' }
+}
+
+/**
+ * 会话事件 → token 用量合计：assistant/message 事件逐步累加 usage
+ * （宿主 ≥0.1.5 在事件 data 上携带该步 {inputTokens,outputTokens,totalTokens}；
+ * 每步 inputTokens 含该步全量 prompt，逐步求和 = API 实际计费口径）。
+ * 会话没有 usage 记录（旧宿主/适配器未上报）时返回 undefined。
+ */
+function sumUsage(agent, firstSeq) {
+  let found = false
+  const total = { inputTokens: 0, outputTokens: 0, totalTokens: 0, calls: 0 }
+  for (const ev of sessionEventList(agent)) {
+    if (!ev || ev.seq < firstSeq) continue
+    const u = ev.type === 'assistant/message' && ev.data ? ev.data.usage : undefined
+    if (!u || typeof u !== 'object') continue
+    found = true
+    total.inputTokens += Number(u.inputTokens) || 0
+    total.outputTokens += Number(u.outputTokens) || 0
+    total.totalTokens += Number(u.totalTokens) || 0
+    total.calls += 1
+  }
+  return found ? total : undefined
+}
+
+/** 两份用量合并成新对象（a 可为 undefined）——运行合计 = 已累计 + 本次增量。 */
+function addUsage(a, b) {
+  const base = a || { inputTokens: 0, outputTokens: 0, totalTokens: 0, calls: 0 }
+  return {
+    inputTokens: base.inputTokens + b.inputTokens,
+    outputTokens: base.outputTokens + b.outputTokens,
+    totalTokens: base.totalTokens + b.totalTokens,
+    calls: base.calls + b.calls,
+  }
 }
 
 class ExecutionService {
@@ -138,6 +172,10 @@ class ExecutionService {
         for (const gate of gates) {
           if (!gate || typeof gate !== 'object') continue
           const judge = await this.judgeGate(run, entry, gate, output)
+          if (judge.usage) {
+            attempt.gateUsage = addUsage(attempt.gateUsage, judge.usage)
+            run.usage = addUsage(run.usage, judge.usage)
+          }
           if (!attempt.gate || (judge.score < (attempt.gate.score ?? 101))) attempt.gate = { name: gate.name || gate.type || 'gate', score: judge.score, minScore: gate.min_score ?? 0, reason: judge.reason }
           const min = typeof gate.min_score === 'number' ? gate.min_score : 0
           if (judge.score < min) { failedGate = { gate: { name: gate.name || gate.type || 'gate', score: judge.score, minScore: min, reason: judge.reason }, linkId: cursor }; break }
@@ -231,6 +269,14 @@ class ExecutionService {
     ].filter((x) => x !== '').join('\n')
   }
 
+  /** 运行工作目录（产物收集/预览用）：绑定工作区用其路径，否则用户库根目录。 */
+  runCwd(run) {
+    const workspace = run.workspaceId && this.ctx.workspaceRegistry
+      ? this.ctx.workspaceRegistry.get(run.workspaceId)
+      : undefined
+    return workspace ? workspace.path : this.settings.get().userRoot
+  }
+
   async createSession({ run, title, withTools = true }) {
     const selection = run.model
       ? { provider: run.provider, model: run.model }
@@ -280,7 +326,8 @@ class ExecutionService {
     const prompt = this.buildLinkPrompt(run, entry)
     const { agent, sessionId } = await this.createSession({
       run,
-      title: `${run.displayName || run.processName} · ${entry.link.name || entry.link.id}`,
+      // 会话标题带运行名（工艺名 · 需求摘要）：同工艺多次运行的同名环节在会话列表里也能分开
+      title: `${run.runName || run.displayName || run.processName} · ${entry.link.name || entry.link.id}`,
     })
     attempt.sessionId = sessionId
     this.runs.touch(run)
@@ -327,6 +374,17 @@ class ExecutionService {
     try { if (this.ctx.sessions && typeof this.ctx.sessions.flush === 'function') await this.ctx.sessions.flush(agent.session) } catch { /* 刷盘失败不致命 */ }
 
     attempt.outputTail = output.slice(-OUTPUT_TAIL_CAP)
+    // 环节 token 用量：全新会话 → 会话内逐步 usage 求和即本环节消耗
+    const usage = sumUsage(agent, firstSeq)
+    if (usage) {
+      attempt.usage = usage
+      run.usage = addUsage(run.usage, usage)
+    }
+    // 产物收集：只认会话里真实的写文件操作（write/edit 结果 meta.diffs、str-replace-editor
+    // 调用参数），按路径累计 +n/-n 与 diff；逐个 stat 出存在性
+    try {
+      attempt.artifacts = await resolveArtifactEntries({ cwd: this.runCwd(run), written: collectWriteOps(eventList(), firstSeq) })
+    } catch { /* stat 失败不致命：产物列表留空 */ }
     return output
   }
 
@@ -342,7 +400,7 @@ class ExecutionService {
       `【执行报告】\n${output || '(无输出)'}`,
     ].join('\n')
     try {
-      const { agent } = await this.createSession({ run, title: `门禁评审 · ${gate.name || gate.type}`, withTools: false })
+      const { agent } = await this.createSession({ run, title: `门禁评审 · ${run.runName || run.displayName || run.processName} · ${gate.name || gate.type}`, withTools: false })
       await agent.whenIdle()
       const firstSeq = agent.session.seq
       const eventList = () => sessionEventList(agent)
@@ -350,7 +408,8 @@ class ExecutionService {
       const idle = agent.whenIdle()
       const timer = new Promise((resolve) => setTimeout(() => resolve('timeout'), JUDGE_TIMEOUT_MS))
       const outcome = await Promise.race([idle.then(() => 'done'), timer])
-      if (outcome !== 'done') return { score: 0, reason: '评审超时，按不通过处理' }
+      const usage = sumUsage(agent, firstSeq)
+      if (outcome !== 'done') return { score: 0, reason: '评审超时，按不通过处理', usage }
       const list = eventList()
       let text = ''
       for (let i = list.length - 1; i >= 0; i--) {
@@ -362,7 +421,7 @@ class ExecutionService {
           if (text.trim() !== '') break
         }
       }
-      return parseJudgeOutput(text)
+      return { ...parseJudgeOutput(text), usage }
     } catch (error) {
       return { score: 0, reason: `评审会话失败：${String(error && error.message || error)}` }
     }
@@ -463,4 +522,4 @@ class ExecutionService {
   }
 }
 
-module.exports = { ExecutionService, parseJudgeOutput, runSummary }
+module.exports = { ExecutionService, parseJudgeOutput, sumUsage, addUsage, runSummary }

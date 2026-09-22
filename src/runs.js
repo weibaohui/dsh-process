@@ -65,6 +65,16 @@ function firstLinkId(snapshot) {
   return null
 }
 
+/**
+ * 运行名称 = 用户需求首行摘要（截断）。不带工艺名——同一工艺反复发起时工艺名
+ * 是相同前缀，反而让条目看起来都一样；需求为空才退回工艺名。
+ */
+function deriveRunName({ displayName, processName, userInput }) {
+  const firstLine = String(userInput || '').trim().split('\n')[0].replace(/\s+/g, ' ').trim()
+  if (firstLine === '') return displayName || processName || 'run'
+  return firstLine.length > 24 ? firstLine.slice(0, 24) + '…' : firstLine
+}
+
 /** 环节执行记录（trail 条目）。 */
 function makeAttempt(phaseId, linkId, attempt, extra) {
   return Object.assign({
@@ -85,7 +95,9 @@ function runSummary(run) {
   const total = new Set([...indexLinks(run.snapshot).map.keys()]).size
   return {
     id: run.id, processId: run.processId, processName: run.processName, displayName: run.displayName,
+    runName: run.runName || run.displayName || run.processName,
     status: run.status, doneLinks: done, totalLinks: total, stepCount: run.stepCount,
+    usage: run.usage,
     current: run.current ? { linkId: run.current.linkId, attempt: run.current.attempt } : null,
     pendingBreak: !!run.pendingBreak,
     workspaceId: run.workspaceId, error: run.error,
@@ -164,12 +176,14 @@ class RunStore {
     const run = {
       id: 'run-' + randomUUID().slice(0, 8),
       processId, processName, displayName,
+      runName: deriveRunName({ displayName, processName, userInput }),
       snapshotYaml, snapshot,
       workspaceId: workspaceId || undefined,
       userInput: typeof userInput === 'string' && userInput.trim() !== '' ? userInput.trim().slice(0, 4000) : undefined,
       model: model || undefined, provider: provider || undefined,
       status: 'queued',            // queued|running|paused|awaiting|done|stopped|failed
       trail: [],
+      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, calls: 0 }, // 全运行 token 合计（环节 + 门禁评审）
       stepCount: 0,
       rework: {},                  // linkId → gate-fail 重试次数
       current: null,               // { phaseId, linkId, attempt }
@@ -199,6 +213,6 @@ class RunStore {
 }
 
 module.exports = {
-  RunStore, runSummary, makeAttempt, parseFlow, indexLinks, nextLinkAfter, firstLinkId,
+  RunStore, runSummary, makeAttempt, parseFlow, indexLinks, nextLinkAfter, firstLinkId, deriveRunName,
   FLOW_KEYWORDS, MAX_RUNS_KEPT,
 }

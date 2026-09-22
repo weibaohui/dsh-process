@@ -97,14 +97,17 @@ test('save create/update/copy + conflict + exists + invalid + readonly', async (
   await assert.rejects(() => store.save({ mode: 'update', id: 'bundled:software/bun.yaml', yaml: GOOD('x') }), (e) => e.code === 'readonly')
 })
 
-test('rename moves file and rewrites process.name', async () => {
+test('rename rewrites display_name in place, file/id unchanged', async () => {
   const { store, user } = makeStore()
   await store.load()
-  const r = await store.rename('user:mine.yaml', 'renamed')
-  assert.equal(r.id, 'user:renamed.yaml')
-  assert.ok(!existsSync(join(user, 'mine.yaml')))
-  assert.match(readFileSync(join(user, 'renamed.yaml'), 'utf8'), /name: renamed/)
+  const r = await store.rename('user:mine.yaml', '新名字')
+  assert.equal(r.id, 'user:mine.yaml')
+  assert.ok(existsSync(join(user, 'mine.yaml')))
+  const text = readFileSync(join(user, 'mine.yaml'), 'utf8')
+  assert.match(text, /display_name: 新名字/)
+  assert.match(text, /name: mine/) // name 标识不动
   await assert.rejects(() => store.rename('bundled:software/bun.yaml', 'x'), (e) => e.code === 'readonly')
+  await assert.rejects(() => store.rename('user:mine.yaml', '   '), (e) => e.code === 'invalid_input')
 })
 
 test('remove moves into .trash and hides it from listing', async () => {

@@ -84,12 +84,13 @@ async function atomicWrite(absPath, content) {
   await fsP.rename(tmp, absPath)
 }
 
-/** 用 Document API 改 process.name / guid，注释与键序不丢。 */
-function rewriteIdentity(yamlText, { name, guid }) {
+/** 用 Document API 改 process.name / display_name / guid，注释与键序不丢。 */
+function rewriteIdentity(yamlText, { name, displayName, guid }) {
   const doc = YAML.parseDocument(yamlText)
   if (doc.errors.length > 0) return yamlText
   if (!doc.has('process') || !YAML.isMap(doc.get('process', true))) return yamlText
   if (name !== undefined) doc.setIn(['process', 'name'], name)
+  if (displayName !== undefined) doc.setIn(['process', 'display_name'], displayName)
   if (guid !== undefined) doc.setIn(['process', 'guid'], guid)
   return doc.toString()
 }
@@ -339,23 +340,23 @@ class ProcessStore {
     return { id, hash: sha1(text), diagnostics: { errors: [], warnings: result.warnings }, meta: result.meta }
   }
 
-  async rename(id, newName) {
+  /**
+   * 重命名 = 改显示名（process.display_name）：界面各处（列表 / 详情标题 / 运行名）
+   * 展示的都是显示名。文件名与 name 标识保持不变，因此 id 稳定、已发起的运行不受影响。
+   */
+  async rename(id, newDisplayName) {
     const { source, relPath } = parseId(id)
     if (source !== 'user') throw new StoreError('readonly', '内置库只读')
-    const name = safeName(newName)
-    const dir = path.posix.dirname(relPath)
-    const rel = `${dir && dir !== '.' ? dir + '/' : ''}${name}.yaml`
-    const fromAbs = this.userAbs(relPath)
-    const toAbs = this.userAbs(rel)
-    if (rel === relPath) return { id }
-    if (await this.exists(toAbs)) throw new StoreError('exists', `已存在同名工艺：${rel}`)
+    const displayName = String(newDisplayName || '').trim()
+    if (displayName === '') throw new StoreError('invalid_input', '显示名不能为空')
+    if (displayName.length > 120) throw new StoreError('invalid_input', '显示名过长（≤120 字）')
+    const abs = this.userAbs(relPath)
     let text
-    try { text = await fsP.readFile(fromAbs, 'utf8') } catch { throw new StoreError('not_found', `文件已不存在：${relPath}`) }
-    const next = rewriteIdentity(text, { name })
-    await atomicWrite(toAbs, next)
-    await fsP.unlink(fromAbs)
+    try { text = await fsP.readFile(abs, 'utf8') } catch { throw new StoreError('not_found', `文件已不存在：${relPath}`) }
+    const next = rewriteIdentity(text, { displayName })
+    await atomicWrite(abs, next)
     await this.load()
-    return { id: `user:${rel}`, hash: sha1(next) }
+    return { id, hash: sha1(next) }
   }
 
   /** 删除 = 移入 .trash（带时间戳），返回回收站相对路径。 */

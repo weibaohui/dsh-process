@@ -7,7 +7,7 @@
  * GET  /item?id=              单条 {meta, yaml, parsed, diagnostics, hash}
  * POST /validate {yaml}       {errors[], warnings[], meta}
  * POST /save {mode,...}       create / update(baseHash 乐观锁) / copy → 200 | 400 invalid | 409 conflict/exists | 403 readonly
- * POST /rename {id,newName}
+ * POST /rename {id,newName}  改显示名 process.display_name（文件名 / id 不变）
  * POST /delete {id}           移入 .trash
  * POST /import {files,overwrite}
  * GET  /export?id= | ?all=1 | ?source=user   单 yaml / zip
@@ -18,10 +18,14 @@
  * GET  /events                SSE：hello{revision} / change{revision} / 25s 心跳
  * POST /ai-generate {prompt}  → {jobId}（kit 宿主执行器；服务缺席 503）
  * GET  /jobs?id=              {status, output, code, sessionId}
+ * GET  /runs                  运行列表 {revision, runs[]}
+ * GET  /run?id=               运行详情（含完整 trail）
+ * GET  /run-file?run=&path=   产物预览 {file: {content, binary, truncated, size, additions, deletions, diff}}
  */
 
 const { StoreError, safeName } = require('./store.js')
 const { runSummary } = require('./runs.js')
+const { readArtifactText } = require('./artifacts.js')
 const { skeletonYaml } = require('./validate.js')
 const { buildZip } = require('./zip.js')
 const { randomUUID } = require('node:crypto')
@@ -207,6 +211,15 @@ function registerRoutes(ctx, deps) {
         const run = runs.detail(url.searchParams.get('id') || '')
         if (!run) throw new StoreError('not_found', '运行不存在')
         return sendJson(res, 200, { run })
+      }
+      // GET /run-file?run=&path= — 产物预览（路径须在该运行产物列表内，且落在运行工作区内）
+      if (sub === '/run-file' && method === 'GET') {
+        const run = runs.get(url.searchParams.get('run') || '')
+        if (!run) throw new StoreError('not_found', '运行不存在')
+        const artifacts = []
+        for (const t of run.trail || []) for (const a of t.artifacts || []) artifacts.push(a)
+        const file = await readArtifactText({ cwd: deps.execution.runCwd(run), artifacts, path: url.searchParams.get('path') || '' })
+        return sendJson(res, 200, { file })
       }
       if (sub === '/run-create' && method === 'POST') {
         const body = await readJsonBody(req)

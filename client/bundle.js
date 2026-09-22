@@ -241,7 +241,7 @@ window.__ModuleLoader__.load({
       importCreated: '已导入', importOverwritten: '已覆盖', importExists: '同名已存在（未导入）', importInvalid: '校验未通过',
       settingsTitle: '工艺库设置', settingsUserRoot: '我的库根目录', settingsBundledRoot: '内置库根目录（只读）',
       settingsMaxDepth: '扫描深度', settingsCheckRefs: '校验专家/技能引用', settingsSaved: '设置已保存，正在重扫',
-      renameTitle: '重命名工艺', newName: '新名称',
+      renameTitle: '重命名显示名', newName: '新显示名', renameHint: '只改界面显示的名称，文件名与标识不变',
       aiTitle: 'AI 生成工艺', aiHint: '描述要解决的需求，AI 会产出一版工艺 YAML；生成后可校验并写入我的库',
       aiRequirement: '要做什么（需求描述）', aiComplexity: '复杂度（light/standard/complex…）', aiReference: '参考工艺（可选）',
       aiPreviewTitle: '生成结果预览', aiSaveName: '写入名称', aiSave: '写入我的库', aiParseFail: '输出里没有找到 YAML 代码块',
@@ -267,6 +267,11 @@ window.__ModuleLoader__.load({
       noRuns: '还没有运行记录', noRunsHint: '到「工艺库」打开一个工艺，点「▶ 按工艺执行」发起一次运行',
       emptyRun: '左侧选择一次运行查看看板',
       progress: '{done}/{total} 环节', attemptN: '第 {n} 次尝试', reworkN: '返工 ×{n}',
+      usageTitle: '输入 {input} · 输出 {output} · {calls} 次调用（含门禁评审）', usageTotal: 'Token',
+      artifactsTitle: '产物', artifactMissing: '未生成',
+      artifactsNone: '还没有观察到文件写入：执行中用 write / edit / str-replace-editor 改动的文件会出现在这里',
+      fileViewTitle: '产物预览', fileBinary: '二进制文件，暂不支持预览', fileTruncated: '文件较大，仅显示前 {size}，完整内容请在工作区打开',
+      viewFiles: '查看文件', linkFilesTitle: '环节产物', diffLabel: '变更', contentLabel: '内容', noFiles: '没有观察到文件写入',
       gateLabel: '门禁', gateScore: '{score} 分（线 {min}）',
       openSession: '打开会话', outputLabel: '实时输出', retryLink: '重跑本环节', skipLink: '跳过本环节',
       breakTitle: '门禁未过，等待你的裁决', decisionRetry: '重试本环节', decisionSkip: '跳过本环节', decisionStop: '中止运行',
@@ -330,7 +335,7 @@ window.__ModuleLoader__.load({
       importCreated: 'imported', importOverwritten: 'overwritten', importExists: 'skipped (exists)', importInvalid: 'invalid',
       settingsTitle: 'Process library settings', settingsUserRoot: 'My library root', settingsBundledRoot: 'Bundled library root (read-only)',
       settingsMaxDepth: 'Scan depth', settingsCheckRefs: 'Validate expert/skill references', settingsSaved: 'Settings saved; rescanning',
-      renameTitle: 'Rename process', newName: 'New name',
+      renameTitle: 'Rename display name', newName: 'New display name', renameHint: 'Only the shown name changes; file name and id stay.',
       aiTitle: 'AI generate process', aiHint: 'Describe the need; AI drafts a process YAML you can validate and save into MY library',
       aiRequirement: 'What should it do', aiComplexity: 'Complexity (light/standard/complex…)', aiReference: 'Reference process (optional)',
       aiPreviewTitle: 'Generated preview', aiSaveName: 'Save as', aiSave: 'Save to my library', aiParseFail: 'No YAML code block found in the output',
@@ -356,6 +361,11 @@ window.__ModuleLoader__.load({
       noRuns: 'No runs yet', noRunsHint: 'Open a process in "Library" and click "▶ Run process"',
       emptyRun: 'Pick a run on the left to see its board',
       progress: '{done}/{total} links', attemptN: 'attempt {n}', reworkN: 'rework ×{n}',
+      usageTitle: 'in {input} · out {output} · {calls} calls (incl. gate review)', usageTotal: 'Tokens',
+      artifactsTitle: 'Artifacts', artifactMissing: 'missing',
+      artifactsNone: 'No file writes observed: files changed via write / edit / str-replace-editor during execution appear here',
+      fileViewTitle: 'Artifact preview', fileBinary: 'Binary file — preview not supported', fileTruncated: 'File is large; showing the first {size}. Open it in the workspace for the full content.',
+      viewFiles: 'Files', linkFilesTitle: 'Link artifacts', diffLabel: 'Diff', contentLabel: 'Content', noFiles: 'No file writes observed',
       gateLabel: 'Gate', gateScore: '{score} (min {min})',
       openSession: 'Open chat', outputLabel: 'Live output', retryLink: 'Retry link', skipLink: 'Skip link',
       breakTitle: 'Gate failed — awaiting your decision', decisionRetry: 'Retry this link', decisionSkip: 'Skip this link', decisionStop: 'Stop run',
@@ -513,6 +523,11 @@ window.__ModuleLoader__.load({
     .dsh-prc-runrow { display:flex; flex-direction:column; gap:3px; width:100%; text-align:left; border:1px solid transparent; border-radius:8px; background:transparent; color:inherit; padding:7px 9px; margin:2px 0; cursor:pointer; font:inherit; font-size:12px; box-sizing:border-box; }
     .dsh-prc-runrow:hover { background:var(--dsw-hover, rgba(128,128,128,.1)); }
     .dsh-prc-runrow[data-selected="true"] { background:var(--dsw-active, rgba(128,128,128,.16)); border-color:var(--dsw-alias-border-l2, rgba(128,128,128,.3)); }
+    .dsh-prc-artgroup { margin-bottom:4px; }
+    .dsh-prc-artrow { display:flex; gap:8px; align-items:center; width:100%; text-align:left; border:1px solid var(--dsw-alias-border-l1, rgba(128,128,128,.2)); border-radius:8px; background:transparent; color:inherit; padding:6px 10px; margin:3px 0; cursor:pointer; font:inherit; font-size:12px; box-sizing:border-box; }
+    .dsh-prc-artrow:hover { background:var(--dsw-hover, rgba(128,128,128,.1)); border-color:var(--dsw-alias-border-l2, rgba(128,128,128,.35)); }
+    .dsh-prc-artrow[data-selected="true"] { background:var(--dsw-active, rgba(128,128,128,.16)); border-color:var(--dsw-alias-border-l2, rgba(128,128,128,.35)); }
+    .dsh-prc-mini[data-active="true"] { background:var(--dsw-active, rgba(128,128,128,.16)); }
     .dsh-prc-pill { border-radius:999px; padding:1px 8px; font-size:10px; white-space:nowrap; border:1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.3)); }
     .dsh-prc-pill[data-status="running"] { color:#d9822b; border-color:#d9822b; }
     .dsh-prc-pill[data-status="queued"] { color:#3e63dd; border-color:#3e63dd; }
@@ -956,6 +971,10 @@ window.__ModuleLoader__.load({
         } catch (error) {
           if (this.state.runId === id) this.setState({ runLoading: false, error: String(error && error.message || error) })
         }
+      }
+      async loadArtifact(runId, path) {
+        const d = await api('/run-file?run=' + encodeURIComponent(runId) + '&path=' + encodeURIComponent(path))
+        return d.file
       }
       async runAction(action, body) {
         const d = await api('/run-action', { method: 'POST', body: { action, ...body } })
@@ -1543,7 +1562,7 @@ window.__ModuleLoader__.load({
             isUser ? [
               h('button', { key: 'e', className: 'dsh-prc-btn', 'data-primary': 'true', onClick: () => controller.editSelected() }, '✎ ' + t('edit')),
               h('button', { key: 'a', className: 'dsh-prc-btn', title: t('atAgentTitle'), onClick: atAgent }, '@ ' + t('atAgent')),
-              h('button', { key: 'r', className: 'dsh-prc-btn', onClick: () => controller.setState({ dialog: { type: 'rename', id: meta.id, name: meta.fileName } }) }, t('rename')),
+              h('button', { key: 'r', className: 'dsh-prc-btn', onClick: () => controller.setState({ dialog: { type: 'rename', id: meta.id, name: meta.display_name || meta.name } }) }, t('rename')),
               !confirmDelete
                 ? h('button', { key: 'd', className: 'dsh-prc-btn', onClick: () => setConfirmDelete(true) }, '🗑 ' + t('delete'))
                 : h('span', { key: 'dc', style: { display: 'inline-flex', gap: 6, alignItems: 'center' } },
@@ -2045,6 +2064,7 @@ window.__ModuleLoader__.load({
       const [name, setName] = useState(dlg ? dlg.name : '')
       return h(Modal, { title: t('renameTitle'), onClose: () => controller.setState({ dialog: null }) },
         h(FieldInput, { label: t('newName'), value: name, onChange: setName }),
+        h('div', { style: { fontSize: 12, opacity: .7 } }, t('renameHint')),
         h('div', { style: { display: 'flex', gap: 8, justifyContent: 'flex-end' } },
           h('button', { className: 'dsh-prc-btn', onClick: () => controller.setState({ dialog: null }) }, t('cancel')),
           h('button', { className: 'dsh-prc-btn', 'data-primary': 'true', disabled: name.trim() === '', onClick: () => void controller.renameProcess(dlg.id, name.trim()) }, t('confirm'))))
@@ -2249,6 +2269,8 @@ window.__ModuleLoader__.load({
         state.dialog && state.dialog.type === 'settings' ? h(SettingsDialog, { state, controller, t }) : null,
         state.dialog && state.dialog.type === 'ai' ? h(AiDialog, { state, controller, t }) : null,
         state.dialog && state.dialog.type === 'newrun' ? h(NewRunDialog, { state, controller, t }) : null,
+        state.dialog && state.dialog.type === 'fileview' ? h(FileViewDialog, { state, controller, t }) : null,
+        state.dialog && state.dialog.type === 'linkfiles' ? h(LinkFilesDialog, { state, controller, t }) : null,
         state.toast ? h('div', { className: 'dsh-prc-toast', 'data-kind': state.toast.kind }, state.toast.text) : null)
     }
 
@@ -2290,6 +2312,43 @@ window.__ModuleLoader__.load({
       return map
     }
 
+    // ── token 用量展示（v0.5.2）──────────────────────────────────────────────
+
+    /** 环节卡用量 = 环节执行 + 门禁评审两份合并（都缺返回 null）。 */
+    function linkUsage(attempt) {
+      if (!attempt || (!attempt.usage && !attempt.gateUsage)) return null
+      const sum = (a, b) => (a || 0) + (b || 0)
+      const u = attempt.usage, g = attempt.gateUsage
+      return {
+        inputTokens: sum(u && u.inputTokens, g && g.inputTokens),
+        outputTokens: sum(u && u.outputTokens, g && g.outputTokens),
+        totalTokens: sum(u && u.totalTokens, g && g.totalTokens),
+        calls: sum(u && u.calls, g && g.calls),
+      }
+    }
+
+    /** 优先用宿主上报的 totalTokens，缺失时退回 input+output。 */
+    function usageTotalOf(u) {
+      if (!u) return 0
+      return u.totalTokens > 0 ? u.totalTokens : (u.inputTokens || 0) + (u.outputTokens || 0)
+    }
+
+    /** 1234 → 1.2k；670 → 670（去尾零）。 */
+    function fmtTokens(n) {
+      if (!Number.isFinite(n) || n <= 0) return '0'
+      if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M'
+      if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'k'
+      return String(Math.round(n))
+    }
+
+    function UsageBadge({ t, usage }) {
+      if (!usage || usage.calls <= 0) return null
+      return h('span', {
+        className: 'dsh-prc-badge',
+        title: t('usageTitle', { input: fmtTokens(usage.inputTokens), output: fmtTokens(usage.outputTokens), calls: usage.calls }),
+      }, '⚡ ' + fmtTokens(usageTotalOf(usage)))
+    }
+
     function RunList({ state, controller, t }) {
       const runs = state.runs.list
       return h('div', { className: 'dsh-prc-runlist' },
@@ -2301,9 +2360,10 @@ window.__ModuleLoader__.load({
           },
           h('div', { style: { display: 'flex', gap: 6, alignItems: 'center' } },
             h('span', { className: 'dsh-prc-pill', 'data-status': r.status }, t('status' + r.status[0].toUpperCase() + r.status.slice(1))),
-            h('span', { style: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 } }, r.displayName || r.processName)),
+            h('span', { style: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 500 }, title: r.runName || r.displayName || r.processName }, r.runName || r.displayName || r.processName)),
           h('div', { style: { display: 'flex', gap: 6, color: 'var(--dsw-text-secondary, gray)', fontSize: 11 } },
             h('span', null, t('progress', { done: r.doneLinks, total: r.totalLinks })),
+            r.usage && r.usage.calls > 0 ? h('span', { title: t('usageTitle', { input: fmtTokens(r.usage.inputTokens), output: fmtTokens(r.usage.outputTokens), calls: r.usage.calls }) }, '⚡ ' + fmtTokens(usageTotalOf(r.usage))) : null,
             h('span', null, new Date(r.updatedAt).toLocaleTimeString())))))
     }
 
@@ -2324,13 +2384,178 @@ window.__ModuleLoader__.load({
           attempt && attempt.gate && attempt.gate.score !== null && attempt.gate.score !== undefined
             ? h('span', { className: 'dsh-prc-badge', 'data-kind': attempt.gate.score >= (attempt.gate.minScore || 0) ? 'ok' : 'err', title: attempt.gate.reason },
               t('gateLabel') + ' ' + attempt.gate.score + ' / ' + (attempt.gate.minScore || 0)) : null,
+          h(UsageBadge, { t, usage: linkUsage(attempt) }),
           h('span', { style: { fontSize: 11, opacity: .75 } }, t(LINK_STATE_KEY[st] || 'linkPending'))),
         h('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } },
           attempt && attempt.sessionId ? h('button', { className: 'dsh-prc-mini', onClick: () => controller.openSession(attempt.sessionId) }, t('openSession')) : null,
+          h('button', { className: 'dsh-prc-mini', onClick: () => controller.setState({ dialog: { type: 'linkfiles', runId: run.id, linkId: link.id, name: link.name || link.id } }) }, t('viewFiles')),
           attempt && attempt.outputTail ? h('button', { className: 'dsh-prc-mini', onClick: () => setOpen(!open) }, (open ? '▾ ' : '▸ ') + t('outputLabel')) : null,
           !active && attempt ? h('button', { className: 'dsh-prc-mini', onClick: () => void controller.runAction('retry-link', { id: run.id, linkId: link.id }) }, t('retryLink')) : null,
           !active && st !== 'pending' ? h('button', { className: 'dsh-prc-mini', onClick: () => void controller.runAction('skip-link', { id: run.id, linkId: link.id }) }, t('skipLink')) : null),
         open && attempt && attempt.outputTail ? h('pre', { className: 'dsh-prc-pre dsh-prc-tail' }, attempt.outputTail) : null)
+    }
+
+    /** 字节数可读化（产物大小）。 */
+    function fmtBytes(n) {
+      if (!Number.isFinite(n) || n <= 0) return '0 B'
+      if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + ' MB'
+      if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + ' KB'
+      return Math.round(n) + ' B'
+    }
+
+    /** diffstat：+12 −3（git 风格带色）。 */
+    function DiffStat({ additions, deletions }) {
+      if (!additions && !deletions) return null
+      return h('span', { style: { fontFamily: 'var(--dsw-font-family-mono, monospace)', fontSize: 11, whiteSpace: 'nowrap' } },
+        additions > 0 ? h('span', { style: { color: '#4a9a4a' } }, '+' + additions) : null,
+        additions > 0 && deletions > 0 ? ' ' : null,
+        deletions > 0 ? h('span', { style: { color: '#c75050' } }, '−' + deletions) : null)
+    }
+
+    /** diff 文本 → 按行着色（+/−/@@）。 */
+    function DiffView({ text }) {
+      if (!text) return h('div', { style: { fontSize: 12, opacity: .6, padding: 8 } }, '—')
+      return h('pre', { className: 'dsh-prc-pre', style: { margin: 0, fontSize: 12, lineHeight: 1.55, overflow: 'auto' } },
+        text.split('\n').map((l, i) => {
+          const kind = l.startsWith('+') ? 'add' : l.startsWith('-') ? 'del' : l.startsWith('@@') ? 'hunk' : 'ctx'
+          return h('span', { key: i, style: {
+            display: 'block',
+            whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+            color: kind === 'add' ? '#4a9a4a' : kind === 'del' ? '#c75050' : kind === 'hunk' ? '#8080c0' : undefined,
+            background: kind === 'add' ? 'rgba(74,154,74,.08)' : kind === 'del' ? 'rgba(199,80,80,.08)' : undefined,
+          } }, l === '' ? ' ' : l)
+        }))
+    }
+
+    /** 产物查看器：拉 /run-file（content 与 diff 一次拿全），变更/内容两个 tab。 */
+    function ArtifactViewer({ t, controller, runId, path }) {
+      const [file, setFile] = useState(null)
+      const [error, setError] = useState(null)
+      const [tab, setTab] = useState('diff')
+      useEffect(() => {
+        let alive = true
+        setFile(null)
+        setError(null)
+        setTab('diff')
+        controller.loadArtifact(runId, path)
+          .then((f) => { if (alive) setFile(f) })
+          .catch((e) => { if (alive) setError(String(e && e.message || e)) })
+        return () => { alive = false }
+      }, [runId, path])
+      if (error) return h('div', { className: 'dsh-prc-empty' }, error)
+      if (!file) return h('div', { className: 'dsh-prc-empty' }, t('loading'))
+      const showTab = file.diff ? tab : 'content'
+      return h('div', null,
+        h('div', { style: { display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0' } },
+          h('span', { className: 'dsh-prc-chip' }, file.path),
+          file.size != null ? h('span', { className: 'dsh-prc-chip' }, fmtBytes(file.size)) : null,
+          h(DiffStat, { additions: file.additions, deletions: file.deletions }),
+          file.truncated ? h('span', { className: 'dsh-prc-badge', 'data-kind': 'warn' }, t('fileTruncated', { size: fmtBytes(1048576) })) : null,
+          h('span', { style: { flex: 1 } }),
+          h('button', { className: 'dsh-prc-mini', 'data-active': showTab === 'diff' || undefined, onClick: () => setTab('diff') }, t('diffLabel')),
+          h('button', { className: 'dsh-prc-mini', 'data-active': showTab === 'content' || undefined, onClick: () => setTab('content') }, t('contentLabel'))),
+        file.binary ? h('div', { className: 'dsh-prc-empty' }, t('fileBinary'))
+          : showTab === 'diff' ? h(DiffView, { text: file.diff })
+            : h('pre', { className: 'dsh-prc-pre', style: { margin: 0, maxHeight: '58vh', overflow: 'auto' } }, file.content))
+    }
+
+    /** 产物列表（看板）：按环节分组，同一路径跨尝试取最新一条记录。 */
+    function ArtifactList({ t, run, controller }) {
+      const linkName = new Map()
+      for (const ph of (run.snapshot && run.snapshot.phases) || []) {
+        for (const ln of (ph && Array.isArray(ph.links) ? ph.links : [])) {
+          if (ln && ln.id) linkName.set(ln.id, (ph.name ? ph.name + ' / ' : '') + (ln.name || ln.id))
+        }
+      }
+      const latest = new Map() // path → { art, linkId }（trail 按时间序，后者覆盖）
+      for (const a of run.trail || []) for (const art of a.artifacts || []) latest.set(art.path, { art, linkId: a.linkId })
+      if (latest.size === 0) return h('div', { style: { fontSize: 12, opacity: .7, padding: '4px 2px' } }, t('artifactsNone'))
+      const groups = new Map()
+      for (const linkId of indexLinksOf(run).keys()) groups.set(linkId, [])
+      for (const [path, v] of latest) {
+        if (!groups.has(v.linkId)) groups.set(v.linkId, [])
+        groups.get(v.linkId).push({ ...v.art, path })
+      }
+      const children = []
+      for (const [linkId, arts] of groups) {
+        if (!arts || arts.length === 0) continue
+        children.push(h('div', { key: linkId, className: 'dsh-prc-artgroup' },
+          h('div', { style: { fontSize: 11, opacity: .65, margin: '8px 0 2px' } }, linkName.get(linkId) || linkId),
+          arts.map((a) => h('button', {
+            key: a.path, className: 'dsh-prc-artrow', title: a.path,
+            onClick: () => controller.setState({ dialog: { type: 'fileview', runId: run.id, path: a.path, name: a.name } }),
+          },
+          h('span', { style: { fontWeight: 500, whiteSpace: 'nowrap' } }, a.name),
+          h('span', { style: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: .7, fontSize: 12 } }, a.path),
+          !a.exists ? h('span', { className: 'dsh-prc-badge', 'data-kind': 'err' }, t('artifactMissing')) : null,
+          h(DiffStat, { additions: a.additions, deletions: a.deletions }),
+          a.exists && a.size != null ? h('span', { style: { fontSize: 11, opacity: .6, whiteSpace: 'nowrap' } }, fmtBytes(a.size)) : null))))
+      }
+      return h('div', { className: 'dsh-prc-artifacts' }, children)
+    }
+
+    /** 产物预览弹窗（看板产物列表点开）。 */
+    function FileViewDialog({ state, controller, t }) {
+      const dlg = state.dialog
+      return h(Modal, { title: t('fileViewTitle') + '：' + (dlg.name || dlg.path), onClose: () => controller.setState({ dialog: null }), width: 860 },
+        h(ArtifactViewer, { t, controller, runId: dlg.runId, path: dlg.path }))
+    }
+
+    /** 路径 → 树：{ dirs: Map, files: [] }。 */
+    function buildFileTree(entries) {
+      const root = { dirs: new Map(), files: [] }
+      for (const e of entries) {
+        const parts = String(e.path).split('/')
+        let node = root
+        for (let i = 0; i < parts.length - 1; i++) {
+          const seg = parts[i]
+          if (seg === '') continue
+          if (!node.dirs.has(seg)) node.dirs.set(seg, { dirs: new Map(), files: [] })
+          node = node.dirs.get(seg)
+        }
+        node.files.push(e)
+      }
+      return root
+    }
+
+    /** 文件树渲染：目录恒展开，文件行带 diffstat，点击选中。 */
+    function FileTree({ t, entries, sel, onSelect }) {
+      const render = (node, depth) => {
+        const out = []
+        for (const [name, child] of [...node.dirs.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+          out.push(h('div', { key: 'd:' + name, style: { padding: '3px 4px', fontSize: 12, opacity: .75, paddingLeft: 4 + depth * 14 } }, '📁 ' + name))
+          out.push(...render(child, depth + 1))
+        }
+        for (const f of [...node.files].sort((a, b) => a.name.localeCompare(b.name))) {
+          out.push(h('button', {
+            key: f.path, className: 'dsh-prc-artrow', 'data-selected': sel === f.path || undefined,
+            style: { paddingLeft: 4 + depth * 14, gap: 6 }, title: f.path, onClick: () => onSelect(f.path),
+          },
+          h('span', { style: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, f.name),
+          h(DiffStat, { additions: f.additions, deletions: f.deletions }),
+          !f.exists ? h('span', { className: 'dsh-prc-badge', 'data-kind': 'err' }, t('artifactMissing')) : null))
+        }
+        return out
+      }
+      return h('div', null, render(buildFileTree(entries), 0))
+    }
+
+    /** 环节产物弹窗：左侧该环节的文件树（同路径取最新一次尝试），右侧查看器。 */
+    function LinkFilesDialog({ state, controller, t }) {
+      const dlg = state.dialog
+      const run = state.run && state.run.id === dlg.runId ? state.run : null
+      const latest = new Map()
+      if (run) for (const a of run.trail || []) if (a.linkId === dlg.linkId) for (const art of a.artifacts || []) latest.set(art.path, art)
+      const entries = [...latest.values()]
+      const [sel, setSel] = useState(null)
+      return h(Modal, { title: t('linkFilesTitle') + '：' + (dlg.name || dlg.linkId), onClose: () => controller.setState({ dialog: null }), width: 960 },
+        h('div', { style: { display: 'flex', gap: 12, minHeight: 320 } },
+          h('div', { style: { width: 280, flexShrink: 0, overflowY: 'auto', maxHeight: '62vh', borderRight: '1px solid var(--dsw-alias-border-l1, rgba(128,128,128,.2))', paddingRight: 8 } },
+            entries.length === 0 ? h('div', { style: { fontSize: 12, opacity: .7, padding: 4 } }, t('noFiles'))
+              : h(FileTree, { t, entries, sel, onSelect: setSel })),
+          h('div', { style: { flex: 1, minWidth: 0, overflowY: 'auto', maxHeight: '62vh' } },
+            sel ? h(ArtifactViewer, { t, controller, runId: dlg.runId, path: sel })
+              : h('div', { className: 'dsh-prc-empty' }, t('selectFirst')))))
     }
 
     function RunBoard({ state, controller, t }) {
@@ -2343,9 +2568,10 @@ window.__ModuleLoader__.load({
       const active = ['queued', 'running', 'awaiting', 'paused'].includes(run.status)
       const children = [
         h('div', { className: 'dsh-prc-runhead' },
-          h('h3', { className: 'dsh-prc-detail-title' }, run.displayName || run.processName),
+          h('h3', { className: 'dsh-prc-detail-title' }, run.runName || run.displayName || run.processName),
           h(StatusPill, { t, status: run.status }),
           h('span', { className: 'dsh-prc-count' }, t('progress', { done, total })),
+          h(UsageBadge, { t, usage: run.usage }),
           h('div', { className: 'dsh-prc-actions' },
             run.status === 'running' || run.status === 'queued' ? h('button', { className: 'dsh-prc-btn', onClick: () => void controller.runAction('pause', { id: run.id }) }, t('pause')) : null,
             run.status === 'paused' ? h('button', { className: 'dsh-prc-btn', 'data-primary': 'true', onClick: () => void controller.runAction('resume', { id: run.id }) }, t('resume')) : null,
@@ -2357,6 +2583,7 @@ window.__ModuleLoader__.load({
       ]
       if (run.userInput) children.push(h('div', { className: 'dsh-prc-kv', style: { background: 'var(--dsw-alias-bg-layer-2, rgba(128,128,128,.06))', border: '1px solid var(--dsw-alias-border-l1, rgba(128,128,128,.2))', borderRadius: 8, padding: '6px 10px' } }, h('b', null, '📌 ' + t('runUserInput') + '：'), h('span', { style: { whiteSpace: 'pre-wrap' } }, run.userInput)))
       children.push(h('div', { className: 'dsh-prc-sec' }, h(FlowGraph, { t, parsed: run.snapshot, run })))
+      children.push(h('div', { className: 'dsh-prc-sec' }, h('h4', null, t('artifactsTitle')), h(ArtifactList, { t, run, controller })))
       if (run.pendingBreak) {
         children.push(h('div', { className: 'dsh-prc-break' },
           h('span', { style: { fontWeight: 600 } }, '⚠ ' + t('breakTitle')),
