@@ -10,7 +10,7 @@ const SECTION_ORDER = 620
 
 const PROCESS_PROTOCOL = `## 工艺库（dsh-process）
 
-本环境装有工艺库：「工艺」= ntd 的 Process，一份多阶段（phase）、多环节（link）的 agent 工作流模板。
+本环境装有工艺库：「工艺」= Process，一份多阶段（phase）、多环节（link）的 agent 工作流模板。
 用户提到「工艺 / 按工艺执行 / 工艺模板 / process template」时：
 
 1. 先 \`process_list\` 看有哪些工艺（我的库可写，内置库只读），再 \`process_get\` 读结构摘要（outline）。

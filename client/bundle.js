@@ -232,7 +232,7 @@ window.__ModuleLoader__.load({
       flowNext: '下一环节', flowEnd: '结束', flowBreak: '中止（询问用户）',
       editorTitle: '编辑', editorCreate: '新建工艺', editorCopy: '复制工艺',
       unsaved: '未保存', saved: '已保存', validating: '校验中…',
-      saveConflict: '文件已被外部修改（可能是 ntd 或其他编辑器）。', forcedHint: '覆盖将丢弃外部改动。',
+      saveConflict: '文件已被外部修改（可能是其他编辑器）。', forcedHint: '覆盖将丢弃外部改动。',
       dirtyGuard: '有未保存的修改，确定放弃吗？',
       deleteConfirm: '删除后移入回收站（.trash），确定删除',
       createName: '工艺名（文件名，不含 .yaml）', createDir: '子目录（可选，如 software）', createDisplayName: '显示名（可选）',
@@ -247,7 +247,7 @@ window.__ModuleLoader__.load({
       aiPreviewTitle: '生成结果预览', aiSaveName: '写入名称', aiSave: '写入我的库', aiParseFail: '输出里没有找到 YAML 代码块',
       copied: '已复制', copyYaml: '复制 YAML',
       openSession: '打开会话', aiRunning: '生成中…', aiDone: '生成完成',
-      openLib: '打开工艺库', settingsSectionHint: '工艺 = ntd 的多阶段 agent 工作流模板；此处配置工艺库根目录。',
+      openLib: '打开工艺库', settingsSectionHint: '工艺 = 多阶段 agent 工作流模板；此处配置工艺库根目录。',
       validate: '校验', linesCount: '{n} 行',
       toastSaved: '已保存', toastForceSaved: '已覆盖保存', toastCopied: '已复制到我的库', toastRenamed: '已重命名',
       toastTrashed: '已移入回收站（.trash）', toastImported: '{n} 个工艺已导入', toastAiSaved: '已写入我的库',
@@ -326,7 +326,7 @@ window.__ModuleLoader__.load({
       flowNext: 'next link', flowEnd: 'end', flowBreak: 'break (ask user)',
       editorTitle: 'Edit', editorCreate: 'New process', editorCopy: 'Duplicate process',
       unsaved: 'Unsaved', saved: 'Saved', validating: 'Validating…',
-      saveConflict: 'The file was changed externally (ntd or another editor).', forcedHint: 'Overwriting discards those changes.',
+      saveConflict: 'The file was changed externally (another editor).', forcedHint: 'Overwriting discards those changes.',
       dirtyGuard: 'Discard unsaved changes?',
       deleteConfirm: 'Delete moves the file into .trash. Delete',
       createName: 'Process name (file name, no .yaml)', createDir: 'Sub-directory (optional, e.g. software)', createDisplayName: 'Display name (optional)',
@@ -341,7 +341,7 @@ window.__ModuleLoader__.load({
       aiPreviewTitle: 'Generated preview', aiSaveName: 'Save as', aiSave: 'Save to my library', aiParseFail: 'No YAML code block found in the output',
       copied: 'Copied', copyYaml: 'Copy YAML',
       openSession: 'Open chat', aiRunning: 'Generating…', aiDone: 'Generated',
-      openLib: 'Open process library', settingsSectionHint: 'A process is an ntd multi-phase agent workflow template; configure library roots here.',
+      openLib: 'Open process library', settingsSectionHint: 'A process is a multi-phase agent workflow template; configure library roots here.',
       validate: 'Validate', linesCount: '{n} lines',
       toastSaved: 'Saved', toastForceSaved: 'Overwritten and saved', toastCopied: 'Copied to my library', toastRenamed: 'Renamed',
       toastTrashed: 'Moved to .trash', toastImported: '{n} process(es) imported', toastAiSaved: 'Saved to my library',
@@ -555,7 +555,7 @@ window.__ModuleLoader__.load({
     .dsh-prc-flowlegend .sw.jump { border-color:#22c55e; }
     .dsh-prc-flowlegend .sw.fail { border-color:var(--dsw-alias-state-error, #ef4444); border-top-style:dashed; }
     .dsh-prc-form { flex:1; min-height:0; overflow-y:auto; padding:12px 16px; box-sizing:border-box; }
-    /* 画布编辑器：左画布（阶段泳道+环节节点）+ 右属性面板（ntd 同款交互） */
+    /* 画布编辑器：左画布（阶段泳道+环节节点）+ 右属性面板 */
     .dsh-prc-canvas { flex:1; min-height:0; display:flex; overflow:hidden; }
     .dsh-prc-canvas-left { flex:1; min-width:0; overflow:auto; padding:14px; box-sizing:border-box; }
     .dsh-prc-canvas-bar { display:flex; align-items:center; gap:10px; margin-bottom:12px; position:sticky; top:0; z-index:2; background:var(--dsw-alias-bg-base, inherit); padding:4px 0; }
@@ -1943,7 +1943,7 @@ window.__ModuleLoader__.load({
       const ed = state.editor
       const taRef = useRef(null)
       const gutterRef = useRef(null)
-      // 子模式：'form'（画布：左节点图+右属性面板，ntd 同款）| 'yaml'（YAML 文本）——同一份 ed.text 双向实时同步
+      // 子模式：'form'（画布：左节点图+右属性面板）| 'yaml'（YAML 文本）——同一份 ed.text 双向实时同步
       const [subMode, setSubMode] = useState('form')
       const docOk = useMemo(() => !!fmDoc(ed ? ed.text : ''), [ed && ed.text])
       const mode = subMode === 'form' && !docOk ? 'yaml' : subMode
@@ -2148,7 +2148,7 @@ window.__ModuleLoader__.load({
 
     // ── ⚡ AI 生成（kit ActionShareDialog + completedView 预览确认） ────────────
 
-    const AI_PROMPT = `请为下面的需求设计一个 ntd 工艺（Process：多阶段 phase、多环节 link 的 agent 工作流模板），输出严格的 YAML。
+    const AI_PROMPT = `请为下面的需求设计一个工艺（Process：多阶段 phase、多环节 link 的 agent 工作流模板），输出严格的 YAML。
 
     需求：{{requirement}}
     复杂度：{{complexity}}
@@ -2654,7 +2654,7 @@ window.__ModuleLoader__.load({
     /**
      * 流程图可视化（v0.3）：工艺 YAML → 有向图 → 零依赖分层布局 → SVG 渲染。
      *
-     * 建模对齐 ntd（nothing-todo）ProcessFlowGraph 的视觉语言：
+     * 建模对齐 ProcessFlowGraph 的视觉语言：
      * - START → 第一个环节 → … → END；on_success 实线（forward 灰 / goto 跳转绿），
      *   on_gate_fail 红色虚线 + 「门禁未过 → <id>」标签，break 不连线只在节点上标注，
      *   回边（指向更早环节）从节点上沿绕行，自环画右侧小环。

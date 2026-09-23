@@ -3,8 +3,8 @@
 /**
  * @weibaohui/dsh-process — Host half（工艺管理）。
  *
- * 把 ntd 的「工艺」（Process：多阶段·多环节 agent 工作流模板）接进 dsh：
- * - 存储：我的库 ~/.ntd/processes（可写）+ 内置库 ~/.ntd/bundled/processes（只读），
+ * 把「工艺」（Process：多阶段·多环节 agent 工作流模板）接进 dsh：
+ * - 存储：我的库 ~/.ntd/processes（默认根，可改）+ 内置库 ~/.ntd/bundled/processes（只读），
  *   fs.watch 实时同步；根目录可在设置里改（dsh settings 服务，缺席时退回 JSON 文件）。
  * - 路由：/dsh-process/*（JSON + SSE），供浏览器半边使用。
  * - 工具：process_list / process_get / process_validate / process_save（tools 服务在时注册）。

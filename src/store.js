@@ -329,7 +329,7 @@ class ProcessStore {
       let current
       try { current = await fsP.readFile(abs, 'utf8') } catch { throw new StoreError('not_found', `文件已不存在：${rel}`) }
       if (expectHash && sha1(current) !== expectHash) {
-        throw new StoreError('conflict', '文件已被外部修改（可能是 ntd 或其他编辑器），请重新加载后再保存', { currentHash: sha1(current) })
+        throw new StoreError('conflict', '文件已被外部修改（可能是其他编辑器），请重新加载后再保存', { currentHash: sha1(current) })
       }
     } else if (await this.exists(abs)) {
       throw new StoreError('exists', `已存在同名工艺：${rel}`)

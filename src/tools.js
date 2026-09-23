@@ -70,7 +70,7 @@ function registerTools(toolsService, { store }) {
 
   register({
     name: 'process_list',
-    description: 'List ntd 工艺 (Process workflow templates) available in dsh: user library (writable) and bundled library (read-only). '
+    description: 'List 工艺 (Process workflow templates) available in dsh: user library (writable) and bundled library (read-only). '
       + 'Returns compact summaries (id, name, display_name, category, complexity, phases, links). '
       + 'Call this first when the user mentions 工艺 / process template / 按工艺执行.',
     parameters: {

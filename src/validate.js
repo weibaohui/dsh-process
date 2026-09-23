@@ -3,7 +3,7 @@
 /**
  * dsh-process — 工艺 YAML 校验器（纯函数，无 IO）。
  *
- * ntd 才是 schema 权威；这里只做结构级检查，分两档：
+ * 工艺 YAML 本体是 schema 权威；这里只做结构级检查，分两档：
  * - errors   阻止保存：YAML 语法错 / 缺 process.name / phases 为空 / 环节缺 id /
  *            id 重复 / on_success·on_gate_fail·on_rating_fail 指向不存在的环节。
  * - warnings 只提示：缺 guid·display_name·version、未知复杂度、未知键、阶段无环节、
@@ -125,7 +125,7 @@ function validateProcess(input, options = {}) {
     }
     if (!isNonEmptyString(p.name)) err('missing_name', 'process.name 必填且不能为空', ['process', 'name'])
     else if (/[\\/]/.test(p.name)) err('bad_name', 'process.name 不能包含路径分隔符', ['process', 'name'])
-    if (!isNonEmptyString(p.guid)) warn('missing_guid', '建议填写 process.guid（UUID，ntd 用它标识工艺身份）', ['process', 'guid'])
+    if (!isNonEmptyString(p.guid)) warn('missing_guid', '建议填写 process.guid（UUID，用于标识工艺身份）', ['process', 'guid'])
     else if (!UUID_RE.test(p.guid)) warn('bad_guid', 'process.guid 不是 UUID 格式', ['process', 'guid'])
     if (!isNonEmptyString(p.display_name)) warn('missing_display_name', '建议填写 process.display_name（界面显示名）', ['process', 'display_name'])
     if (p.version === undefined || p.version === null || String(p.version).trim() === '') warn('missing_version', '建议填写 process.version', ['process', 'version'])
@@ -226,7 +226,7 @@ function validateProcess(input, options = {}) {
 /** 新建空白工艺骨架（带注释说明每个字段）。 */
 function skeletonYaml({ name, displayName, guid }) {
   const safeName = String(name || 'new-process')
-  return `# 工艺（Process）定义 —— ntd 格式。每个阶段（phase）包含若干环节（link），
+  return `# 工艺（Process）定义。每个阶段（phase）包含若干环节（link），
 # 环节按 on_success / on_gate_fail 流转；门禁（gates）不过会按 max_rework 返工。
 process:
   name: ${YAML.stringify(safeName).trim()}

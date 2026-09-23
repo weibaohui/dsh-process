@@ -3,22 +3,22 @@
 [![DSH plugin](https://img.shields.io/badge/dsh-plugin-green)](https://github.com/topics/dsh-plugin)
 [![npm version](https://img.shields.io/npm/v/@weibaohui/dsh-process)](https://www.npmjs.com/package/@weibaohui/dsh-process)
 
-**工艺管理插件**：把 ntd 的「工艺」（Process，多阶段 · 多环节的 agent 工作流模板）接进 dsh web——浏览、编辑、校验、导入导出、AI 生成，agent 能用工具读工艺库、按工艺分阶段推进。
+**工艺管理插件**：把「工艺」（Process，多阶段 · 多环节的 agent 工作流模板）接进 dsh web——浏览、编辑、校验、导入导出、AI 生成，agent 能用工具读工艺库、按工艺分阶段推进。
 
 ![工艺库：列表 / 结构 / YAML / 编辑 / AI 生成](docs/demo-process.gif)
 
 ## 核心功能
 
-- **双库浏览**：我的库（`~/.ntd/processes`，可写）+ 内置库（`~/.ntd/bundled/processes`，只读），递归扫描分类子目录；侧栏入口实时显示「我的 | 内置」计数
+- **双库浏览**：我的库（默认 `~/.ntd/processes`，可写）+ 内置库（默认 `~/.ntd/bundled/processes`，只读），递归扫描分类子目录；侧栏入口实时显示「我的 | 内置」计数，根目录均可在设置里改
 - **详情三视图**：概览（元信息 / 限额 / 异常触发 / 诊断清单）、结构（阶段 → 环节树，prompt / 执行器 / 专家 / 技能 / 门禁 / 流转全字段展示）、YAML（行号 + 着色，诊断点击跳行高亮）
-- **编辑器**：行号 + 边写边校验（300ms 防抖），错误阻止保存、警告只黄标；`⌘/Ctrl+S` 保存；**乐观锁**——外部（ntd 或其他编辑器）改过文件会 409，给「重新加载 / 仍然覆盖」二选一
+- **编辑器**：行号 + 边写边校验（300ms 防抖），错误阻止保存、警告只黄标；`⌘/Ctrl+S` 保存；**乐观锁**——外部（其他编辑器）改过文件会 409，给「重新加载 / 仍然覆盖」二选一
 - **校验器**：语法错 / 缺 name / phases 空 / 环节 id 重复 / `on_gate_fail` `goto:` 指向不存在的环节 = 错误；缺 guid、未知专家/技能引用（对照专家库、技能库）、未知键 = 警告
 - **全套 CRUD**：新建（带注释骨架）/ 复制内置到我的库（自动换 guid，注释与未知字段保留）/ 重命名（改显示名，文件名与标识不变）/ 删除（移入 `.trash`）
 - **导入导出**：多文件导入（重名可选覆盖，逐文件报结果）、单个 yaml 下载、全库 zip
-- **实时同步**：fs.watch 两个根目录 → SSE 变更帧 → 界面秒级刷新，ntd 那边改了这边立刻看到
+- **实时同步**：fs.watch 两个根目录 → SSE 变更帧 → 界面秒级刷新，别的编辑器改了这边立刻看到
 - **⚡ AI 生成工艺**：输入需求 + 复杂度 → 真实 agent 会话产出一版工艺 YAML → 校验 → 预览确认 → 写入我的库
 - **agent 协作**：`process_list` / `process_get` / `process_validate` / `process_save` 四个工具 + systemPrompt 段（按工艺推进：一环节一交付、门禁不过按 `on_gate_fail` 流转）；内置库对 agent 同样只读
-- **不发明格式**：100% 复用 ntd 工艺 YAML，编辑走 Document API，注释、键序、未知字段往返不丢
+- **不发明格式**：100% 复用工艺 YAML 原生格式，编辑走 Document API，注释、键序、未知字段往返不丢
 
 ## 安装
 
@@ -26,7 +26,7 @@
 dsh plugin --profile web add @weibaohui/dsh-process
 ```
 
-装完重启 `dsh web` 并刷新页面，侧栏「新会话」下方出现「工艺」入口即成功。零配置：默认读写 ntd 的工艺目录，也可在 ⚙ 设置里改根目录、扫描深度、是否校验专家/技能引用。
+装完重启 `dsh web` 并刷新页面，侧栏「新会话」下方出现「工艺」入口即成功。零配置：默认读写 `~/.ntd` 下的工艺目录（沿用历史路径，可在 ⚙ 设置里改根目录、扫描深度、是否校验专家/技能引用）。
 
 ## 使用
 
