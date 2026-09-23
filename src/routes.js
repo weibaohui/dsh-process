@@ -104,6 +104,14 @@ function registerRoutes(ctx, deps) {
   }
 
   const handler = async (req, res) => {
+    // 与其它 host 路由一致的信任栅栏：connection 服务的 Host/Origin 检查
+    // 加浏览器认证，防止本机任意网页跨站调用。
+    const rejection = ctx.connection.requestRejection(req)
+    if (rejection !== undefined) {
+      res.writeHead(rejection)
+      res.end()
+      return
+    }
     const url = new URL(req.url || '/', 'http://dsh.local')
     const idx = url.pathname.indexOf(PREFIX)
     const sub = (idx >= 0 ? url.pathname.slice(idx + PREFIX.length) : url.pathname).replace(/\/+$/, '') || '/'
