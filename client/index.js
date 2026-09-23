@@ -1229,7 +1229,7 @@ function Toolbar({ state, controller, t }) {
     h('button', { className: 'dsh-prc-btn', 'data-primary': 'true', onClick: openMenu('new') }, '+ ' + t('newTask')),
     h('button', { className: 'dsh-prc-btn', onClick: () => controller.setState({ dialog: { type: 'import' } }) }, t('importBtn')),
     h('button', { className: 'dsh-prc-btn', onClick: openMenu('export') }, t('exportBtn')),
-    h('button', { className: 'dsh-prc-btn', title: t('settingsBtn'), onClick: () => controller.setState({ dialog: { type: 'settings' } }) }, '⚙'),
+    h('button', { className: 'dsh-prc-btn', onClick: () => controller.setState({ dialog: { type: 'settings' } }) }, t('settingsBtn')),
     h('button', { className: 'dsh-prc-btn', title: t('close'), onClick: () => controller.closePanel() }, '✕'),
     menu === null ? null
       : menu.kind === 'new'
