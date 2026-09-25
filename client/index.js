@@ -3,9 +3,9 @@
  *
  * 三个挂载面：
  * - 侧栏入口行（DOM 注入「新会话」下方，与任务看板同一家族块；滚动数字 = 我的 | 内置）。
- * - 主页面：官方 root 级 `shell.overlay` slot（列表+详情/编辑器工作台，全屏 overlay 盖住整个窗口，
- *   知识库同款交互；Esc / 点会话行 / 与其他面板互斥时关闭）。
- * - 兜底：shell.overlay 未渲染的壳层组合下，开面板 450ms 自动改走中栏注入。
+ * - 主页面：中栏接管视图（taskboard 同款，容器挂会话列末尾、html[data-dsh-prc-active] 驱动开合，
+ *   盖会话列不盖侧栏；列表+详情/编辑器工作台；Esc / 点会话行 / 与其他面板互斥时关闭）。
+ * - 兜底：会话列缺席的退化壳层下，开面板 450ms 后容器强制挂 body 退回全屏浮层。
  *
  * 数据流：EventSource /dsh-process/events 变更帧 → 全量 refetch + revision 追赶
  * （taskboard S16 同款）；编辑走 baseHash 乐观锁，409 给「重新加载 / 仍然覆盖」。
@@ -25,6 +25,7 @@ if (!__React || typeof __React.createElement !== 'function') {
   }
 }
 const { createElement: h, useState, useEffect, useMemo, useRef, useCallback } = __React
+const useLayoutEffect = __React.useLayoutEffect || useEffect // React shim 兜底
 
 const CLIENT_NAME = '@weibaohui/dsh-process'
 const API = '/dsh-process'
@@ -32,6 +33,10 @@ const NS = 'dshProcess'
 const PANEL_NAME = 'dsh-process'
 const ACTIVATE_EVENT = 'dsh-panel-activate'
 const ENTRY_ATTR = 'data-dsh-prc-entry'
+// 中栏接管（taskboard 同款）开合属性 + 兄弟面板属性表
+const PRC_ACTIVE_ATTR = 'data-dsh-prc-active'
+const PRC_OTHER_ACTIVE_ATTRS = ['data-dsh-atb-active', 'data-dsh-taskboard-active', 'data-dsh-ssh-active', 'data-dsh-git-active', 'data-dsh-kb-active']
+const PRC_SIDEBAR_ROW_SELECTOR = '[class*="sessionRow"], [class*="projectRow"], [class*="searchResultRow"], [class*="newSession"]'
 const PREFS_KEY = 'dsh-prc:prefs'
 
 // ── i18n ─────────────────────────────────────────────────────────────────
@@ -258,7 +263,16 @@ const STYLE = `
 [data-sidebar-collapsed] [data-dsh-prc-entry] .dsh-prc-entry-label, [data-sidebar-collapsed] [data-dsh-prc-entry] .dsh-prc-entry-stats,
 [class*="_collapsed"] [data-dsh-prc-entry] .dsh-prc-entry-label, [class*="_collapsed"] [data-dsh-prc-entry] .dsh-prc-entry-stats { display:none; }
 
-.dsh-prc-panel { position:fixed; inset:0; display:flex; flex-direction:column; overflow:hidden; pointer-events:auto; background:var(--dsw-alias-bg-base, var(--dsw-bg, #fff)); color:var(--dsw-alias-label-primary, var(--dsw-text-primary, inherit)); font:var(--dsw-font-family, inherit); font-size:13px; z-index:1; }
+/* 中栏接管视图（taskboard 同款）：容器挂进会话列末尾，html 属性驱动开合，只隐藏列内兄弟。
+ * 三代壳层选择器：dev shell data-pane / 官方 CSS-Module centerCol / Desktop 扩展框。 */
+.dsh-prc-view { display:none; }
+html[data-dsh-prc-active] [data-pane="conversation"] > *:not([data-dsh-prc-view]),
+html[data-dsh-prc-active] [class*="centerCol"] > *:not([data-dsh-prc-view]),
+html[data-dsh-prc-active] .dshDesktopConversationSurface > *:not([data-dsh-prc-view]) { display:none !important; }
+html[data-dsh-prc-active] .dsh-prc-view { display:flex; flex-direction:column; height:100%; overflow:hidden; }
+/* 壳层退化（会话列缺席）：容器兜底挂 body 时退回全屏浮层，保证入口点击永远有响应 */
+.dsh-prc-view[data-dsh-prc-fallback] { position:fixed; inset:0; z-index:2147483000; display:flex; }
+.dsh-prc-panel { position:relative; flex:1; min-height:0; display:flex; flex-direction:column; overflow:hidden; pointer-events:auto; background:var(--dsw-alias-bg-base, var(--dsw-bg, #fff)); color:var(--dsw-alias-label-primary, var(--dsw-text-primary, inherit)); font:var(--dsw-font-family, inherit); font-size:13px; }
 .dsh-prc-toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:10px 14px; border-bottom:1px solid var(--dsw-alias-border-l2, rgba(128,128,128,.35)); background:var(--dsw-alias-bg-layer-1, transparent); }
 .dsh-prc-title { font-size:15px; font-weight:600; margin:0; }
 .dsh-prc-count { font-size:12px; color:var(--dsw-text-secondary, gray); }
@@ -594,13 +608,13 @@ class Controller {
     this.setState({ panelOpen: true })
     try { document.dispatchEvent(new CustomEvent(ACTIVATE_EVENT, { detail: PANEL_NAME })) } catch {}
     if (!this.state.loaded) void this.refresh()
-    // 兜底：shell.overlay 在某些壳层组合下不渲染 → 450ms 后仍无面板就改走中栏注入，
+    // 兜底：视图容器未能在中栏放置（壳层退化）→ 450ms 后强制挂 body 全屏，
     // 保证侧栏入口点击永远有响应
     setTimeout(() => {
       if (this.disposed) return
       const s = this.getSnapshot()
       if (s.panelOpen && typeof document !== 'undefined' && !document.querySelector('[data-dsh-prc-panel]')) {
-        mountFallbackPanel(this)
+        if (prcView) prcView.ensure(true)
       }
     }, 450)
   }
@@ -2086,6 +2100,30 @@ function ProcessPanel({ controller, t, slotProps }) {
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [state.panelOpen])
+  // 中栏接管开合：panelOpen ↔ html[data-dsh-prc-active]（useLayoutEffect：开/关都在绘制前生效）
+  useLayoutEffect(() => {
+    try {
+      if (state.panelOpen) {
+        for (const attr of PRC_OTHER_ACTIVE_ATTRS) document.documentElement.removeAttribute(attr)
+        document.documentElement.setAttribute(PRC_ACTIVE_ATTR, '')
+        document.dispatchEvent(new CustomEvent(ACTIVATE_EVENT, { detail: PANEL_NAME }))
+      } else {
+        document.documentElement.removeAttribute(PRC_ACTIVE_ATTR)
+      }
+    } catch {}
+  }, [state.panelOpen])
+  // 点侧栏会话行自动关面板（自家入口子树豁免）
+  useEffect(() => {
+    const onClickRow = (e) => {
+      if (!controller.getSnapshot().panelOpen) return
+      const target = e.target
+      if (!(target instanceof Element)) return
+      if (target.closest('[' + ENTRY_ATTR + ']')) return
+      if (target.closest(PRC_SIDEBAR_ROW_SELECTOR)) controller.closePanel()
+    }
+    document.addEventListener('click', onClickRow, true)
+    return () => document.removeEventListener('click', onClickRow, true)
+  }, [controller])
   if (!state.panelOpen) return null
   const detail = state.editor ? h(EditorPane, { state, controller, t }) : h(DetailPane, { state, controller, t })
   return h('div', { className: 'dsh-prc-panel', 'data-dsh-prc-panel': '' },
@@ -2805,18 +2843,7 @@ function FlowTab({ t, parsed }) {
 const name = CLIENT_NAME
 const inject = ['slots', 'locale']
 
-function mountOverlaySlot(ctx, controller, t) {
-  ctx.effect(() => {
-    try {
-      ctx.slots.inject('shell.overlay', () => ctx.slots.register(
-        { name: 'shell.overlay', id: 'dsh-process', order: 100, locale: NS, label: () => t('title'), inject: () => ({}) },
-        function ProcessOverlaySlot(slotProps) {
-          return h(ProcessPanel, { controller, t, slotProps })
-        },
-      ))
-    } catch (e) { (globalThis.__prcErrors = globalThis.__prcErrors || []).push('overlay:' + (e && e.message)); console.error('[dsh-process] overlay slot:', e) }
-  }, 'dsh-process: overlay slot')
-}
+// （v0.4 起 shell.overlay slot 已移除：全屏 overlay 盖住侧栏观感差，改走 mountPrcView 中栏接管。）
 
 let ReactGlobal = null
 try { ReactGlobal = require('react') } catch {}
@@ -2824,27 +2851,53 @@ try { ReactGlobal = require('react') } catch {}
 /** 同页重复 apply 防护：上一次挂载的 teardown（apply 内赋值）。 */
 let activeApplyTeardown = null
 
-/** overlay 未渲染时的兜底挂载（taskboard 式中栏注入；仅开面板 450ms 后仍无面板才走）。 */
-let fallbackMount = null
-function mountFallbackPanel(controller) {
-  if (fallbackMount) return
-  try {
-    const column = document.querySelector('[data-pane="conversation"], [class*="centerCol"], .dshDesktopConversationSurface')
-    if (!column) return
-    const container = document.createElement('div')
-    container.style.cssText = 'position:fixed;inset:0;z-index:30;pointer-events:none;'
-    column.appendChild(container)
-    const root = require('react-dom/client').createRoot(container)
-    root.render(h('div', { style: { pointerEvents: 'auto', display: 'contents' } },
-      h(ProcessPanel, { controller, t: controller.t || makeT(null), slotProps: null })))
-    fallbackMount = { container, root }
-  } catch (e) { console.error('[dsh-process] fallback mount:', e) }
-}
-function unmountFallbackPanel() {
-  if (!fallbackMount) return
-  try { fallbackMount.root.unmount() } catch {}
-  try { fallbackMount.container.remove() } catch {}
-  fallbackMount = null
+/** 中栏接管视图（apply 内赋值；openPanel 的兜底 ensure 也会用到）。 */
+let prcView = null
+
+/**
+ * 中栏接管视图（taskboard board-mount 同款）：容器 div 追加为会话列末尾子节点
+ * （React shell 不管理它），ProcessPanel 常驻其中、关闭时渲染 null；开合由
+ * html[data-dsh-prc-active] 属性驱动（CSS 隐藏列内兄弟，侧栏保持可见）。
+ * ensure(force)：force=true 时壳层退化兜底——容器挂 body 退回全屏浮层。
+ */
+function mountPrcView(controller, t) {
+  const COLUMN_SELECTOR = '[data-pane="conversation"], [class*="centerCol"], .dshDesktopConversationSurface'
+  let container = null
+  let root = null
+  const unplace = () => {
+    try { if (root) root.unmount() } catch {}
+    try { if (container) container.remove() } catch {}
+    root = null; container = null
+  }
+  const place = (host, fallback) => {
+    container = document.createElement('div')
+    container.className = 'dsh-prc-view'
+    container.setAttribute('data-dsh-prc-view', '')
+    if (fallback) container.setAttribute('data-dsh-prc-fallback', '')
+    host.appendChild(container)
+    root = require('react-dom/client').createRoot(container)
+    root.render(h(ProcessPanel, { controller, t, slotProps: null }))
+  }
+  const ensure = (force) => {
+    if (container && container.isConnected) return
+    const column = document.querySelector(COLUMN_SELECTOR)
+    if (column) { unplace(); place(column, false) }
+    else if (force && document.body) { unplace(); place(document.body, true) }
+  }
+  const tryPlace = () => { ensure(false) }
+  const waitObserver = new MutationObserver(tryPlace)
+  waitObserver.observe(document.body, { childList: true, subtree: true })
+  const retry = setInterval(tryPlace, 2000)
+  tryPlace()
+  return {
+    ensure,
+    dispose() {
+      clearInterval(retry)
+      waitObserver.disconnect()
+      unplace()
+      try { document.documentElement.removeAttribute(PRC_ACTIVE_ATTR) } catch {}
+    },
+  }
 }
 
 const moduleExports = {
@@ -2888,13 +2941,13 @@ const moduleExports = {
     if (typeof activeApplyTeardown === 'function') { try { activeApplyTeardown() } catch {} activeApplyTeardown = null }
     const disposers = []
     try { disposers.push(mountSidebarEntry(controller, t)) } catch (e) { console.error('[dsh-process] sidebar mount:', e) }
-    mountOverlaySlot(ctx, controller, t)
+    try { prcView = mountPrcView(controller, t); disposers.push(() => prcView && prcView.dispose()) } catch (e) { console.error('[dsh-process] view mount:', e) }
     // 与其他面板互斥
     const onActivate = (event) => { if (event.detail !== PANEL_NAME && controller.getSnapshot().panelOpen) controller.closePanel() }
     document.addEventListener(ACTIVATE_EVENT, onActivate)
     const teardown = () => {
       document.removeEventListener(ACTIVATE_EVENT, onActivate)
-      unmountFallbackPanel()
+      if (prcView) { try { prcView.dispose() } catch {} prcView = null }
       for (const d of disposers) { try { d() } catch {} }
       controller.dispose()
     }
