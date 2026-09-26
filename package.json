@@ -19,7 +19,6 @@
     "src",
     "client",
     "scripts",
-    "docs/*.gif",
     "cordis.patch.yml",
     "README.md",
     "LICENSE"
