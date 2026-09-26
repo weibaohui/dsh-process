@@ -1,6 +1,6 @@
 {
   "name": "@weibaohui/dsh-process",
-  "version": "0.6.5",
+  "version": "0.6.6",
   "description": "dsh 插件 · 工艺管理：「工艺」是可复用的多阶段·多环节 agent 工作流模板——定义阶段、环节指令、门禁与流转规则，agent 按工艺分阶段推进。支持浏览/编辑（表单与 YAML 双向同步）/校验/导入导出/AI 生成，内置库只读、我的库可写；面板可直接发起运行，逐环节开真实会话执行、门禁评审，看板跟踪全程。",
   "license": "MIT",
   "main": "src/index.js",
