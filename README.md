@@ -5,7 +5,7 @@
 
 **工艺管理插件**：把「工艺」（Process，多阶段 · 多环节的 agent 工作流模板）接进 dsh web——浏览、编辑、校验、导入导出、AI 生成，agent 能用工具读工艺库、按工艺分阶段推进。
 
-![工艺库：列表 / 结构 / YAML / 编辑 / AI 生成](https://raw.githubusercontent.com/weibaohui/dsh-process/main/docs/demo-process.gif)
+![工艺库：列表 / 结构 / YAML / 编辑 / AI 生成](https://cdn.jsdelivr.net/gh/weibaohui/dsh-process@main/docs/demo-process.gif)
 
 ## 核心功能
 
@@ -58,21 +58,21 @@ npm run check
 
 「✎ 编辑」后可在**表单 / YAML** 两种模式间随时切换，同一份数据源双向实时同步——表单里改一个字段，YAML 立刻变；YAML 手改，表单立即反映。编辑走 Document API，注释与未知字段往返不丢。
 
-![表单编辑：基本信息与限额](https://raw.githubusercontent.com/weibaohui/dsh-process/main/docs/shots/process-3-form-top.png)
+![表单编辑：基本信息与限额](https://cdn.jsdelivr.net/gh/weibaohui/dsh-process@main/docs/shots/process-3-form-top.png)
 
 - **全字段可视化**：基本信息（显示名 / 版本 / 分类 / 复杂度 / 描述）、限额、阶段（名 / 说明）、环节（id / 名 / 执行器 / 专家 / 模型 / 复核方式 / 技能 / 返工上限 / 指令 prompt / 验收标准）、门禁（名 / 类型 / 产物 / 分数线）逐项表单化
 
-![表单编辑：环节卡片全字段](https://raw.githubusercontent.com/weibaohui/dsh-process/main/docs/shots/process-4-form-link.png)
+![表单编辑：环节卡片全字段](https://cdn.jsdelivr.net/gh/weibaohui/dsh-process@main/docs/shots/process-4-form-link.png)
 
 - **流转下拉**：成功后 / 门禁不过 / 评级不过直接下拉选，自动收集全库环节 id 作为跳转选项
 - **id 级联改名**：环节 id 改动自动更新所有 `on_success` / `on_gate_fail` / `on_rating_fail` 引用（含 `goto:` 前缀），不会把流转改断
 
-![流转下拉与门禁增删](https://raw.githubusercontent.com/weibaohui/dsh-process/main/docs/shots/process-5-form-gates.png)
+![流转下拉与门禁增删](https://cdn.jsdelivr.net/gh/weibaohui/dsh-process@main/docs/shots/process-5-form-gates.png)
 
 - **阶段 / 环节 / 门禁可增删**：`+ 添加阶段` / `+ 添加环节` / `+ 添加门禁` 一键加卡；删除带级联（删环节自动清引用，删阶段连其下所有环节一起清）
 - YAML 模式保持行号 + 边写边校验；表单模式对语法错误自动降级提示（修好即恢复）
 
-![表单改名，YAML 实时同步](https://raw.githubusercontent.com/weibaohui/dsh-process/main/docs/shots/process-6-yaml-synced.png)
+![表单改名，YAML 实时同步](https://cdn.jsdelivr.net/gh/weibaohui/dsh-process@main/docs/shots/process-6-yaml-synced.png)
 
 ## 按工艺执行（v0.2）
 
