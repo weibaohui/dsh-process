@@ -3102,7 +3102,21 @@ window.__ModuleLoader__.load({
         } catch {}
         // 会话服务：动态 inject（客户端 ctx 支持；缺席时「打开会话」降级提示）
         try {
-          if (typeof ctx.inject === 'function') ctx.inject(['sessions'], (scope) => { controller.sessionsSvc = scope && scope.sessions })
+          if (typeof ctx.inject === 'function') {
+            ctx.inject(['sessions'], (scope) => {
+              const svc = scope && scope.sessions
+              if (svc && typeof svc.open === 'function') controller.sessionsSvc = svc
+            })
+            // dsh 0.1.7+: sessions.open() 被移除，会话导航改走
+            // uiWorkspace.openSession()。归一成 { open(id) } 面孔，调用点不变。
+            ctx.inject(['uiWorkspace'], (scope) => {
+              const svc = scope && scope.uiWorkspace
+              const cur = controller.sessionsSvc
+              if (svc && typeof svc.openSession === 'function' && !(cur && typeof cur.open === 'function')) {
+                controller.sessionsSvc = { open: (id) => svc.openSession(id) }
+              }
+            })
+          }
         } catch (e) { console.error('[dsh-process] sessions inject:', e) }
         // 同页重复 apply（重建/热重载）：先拆掉上一次挂载，避免残留失效的入口行
         if (typeof activeApplyTeardown === 'function') { try { activeApplyTeardown() } catch {} activeApplyTeardown = null }
