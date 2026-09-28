@@ -162,7 +162,57 @@ window.__ModuleLoader__.load({
         }
       }
 
-      return { substituteParams: substituteParams, makeActionShareDialog: makeActionShareDialog }
+      // ── 共享事件推送枢纽 ─────────────────────────────────────────────────
+      // 解决：dsh web 网关是 HTTP/1.1，同源并发只有 ~6 条连接，每个插件自建
+      // 永久 SSE 会把预算占满、首页全部排队。全页面只开一条
+      // EventSource('/dsh-event-hub/api/stream')，按帧里的 plugin 字段分发。
+      // 服务端由任意消费者经 PluginKit.ensureHostHub(ctx, {webServer, connection})
+      // 在进程内协调出唯一路由（本包 src/index.js）。
+      function ensureClientHub() {
+        if (typeof window === 'undefined' || typeof EventSource === 'undefined') return null
+        if (window.__dshEventHub) return window.__dshEventHub
+
+        var hubSubscribers = new Map() // plugin -> Set<fn(data, frame)>
+        var hubEs = new EventSource('/dsh-event-hub/api/stream')
+        hubEs.onmessage = function (msg) {
+          var frame
+          try { frame = JSON.parse(msg.data) } catch (e) { return }
+          if (!frame || typeof frame.plugin !== 'string') return
+          var set = hubSubscribers.get(frame.plugin)
+          if (!set) return
+          set.forEach(function (fn) {
+            try { fn(frame.data, frame) } catch (e) { /* 单个订阅者出错不影响其他 */ }
+          })
+        }
+
+        window.__dshEventHub = {
+          subscribe: function (plugin, fn) {
+            var set = hubSubscribers.get(plugin)
+            if (!set) { set = new Set(); hubSubscribers.set(plugin, set) }
+            set.add(fn)
+            return function () { set.delete(fn) }
+          },
+          readyState: function () { return hubEs.readyState },
+        }
+        return window.__dshEventHub
+      }
+
+      /**
+       * 订阅某插件的事件流：枢纽就绪则共享连接（零额外连接）；
+       * 浏览器不支持时返回 null，调用方自行回退（自有 SSE / 轮询）。
+       */
+      function connectEvents(plugin, onFrame, onState) {
+        var hub = ensureClientHub()
+        if (!hub) return null
+        var off = hub.subscribe(plugin, function (data, frame) {
+          if (onState) { try { onState('live') } catch (e) {} }
+          onFrame(data, frame)
+        })
+        if (onState) { try { onState('live') } catch (e) {} }
+        return off
+      }
+
+      return { substituteParams: substituteParams, makeActionShareDialog: makeActionShareDialog, ensureClientHub: ensureClientHub, connectEvents: connectEvents }
     })()
 
     /**
@@ -708,17 +758,31 @@ window.__ModuleLoader__.load({
 
       start() {
         void this.refresh()
-        try { this.connectStream() } catch { /* EventSource 不可用：仅手动刷新 */ }
+        try { this.connectStream() } catch { /* 实时通道不可用：仅手动刷新 */ }
       }
       connectStream() {
-        const es = new EventSource(API + '/events')
-        this.es = es
-        const onFrame = (e) => {
-          try { const d = JSON.parse(e.data); this.seenRevision = d.revision; this.seenRunsRevision = d.runsRevision } catch {}
+        const onEvent = (event, payload) => {
+          if (event !== 'hello' && event !== 'change') return
+          try { this.seenRevision = payload.revision; this.seenRunsRevision = payload.runsRevision } catch (e) {}
           void this.refresh()
         }
-        es.addEventListener('hello', onFrame)
-        es.addEventListener('change', onFrame)
+        // 枢纽优先（dsh-plugin-kit ≥0.4 的共享单连接）；帧形状 {event, data}
+        if (typeof PluginKit !== 'undefined' && typeof PluginKit.connectEvents === 'function') {
+          this.hubOff = PluginKit.connectEvents('dsh-process', (data) => {
+            if (data && typeof data.event === 'string') onEvent(data.event, data.data)
+          }, () => {})
+          if (this.hubOff) return
+        }
+        const es = new EventSource(API + '/events')
+        this.es = es
+        es.addEventListener('hello', (e) => {
+          let d; try { d = JSON.parse(e.data) } catch (err) { return }
+          onEvent('hello', d)
+        })
+        es.addEventListener('change', (e) => {
+          let d; try { d = JSON.parse(e.data) } catch (err) { return }
+          onEvent('change', d)
+        })
         es.onerror = () => { /* EventSource 自动重连；hello 里对齐 gap */ }
       }
       async refresh() {
@@ -764,6 +828,7 @@ window.__ModuleLoader__.load({
       }
       dispose() {
         this.disposed = true
+        if (this.hubOff) { try { this.hubOff() } catch {} }
         if (this.es) { try { this.es.close() } catch {} }
         if (this.validateTimer) clearTimeout(this.validateTimer)
         if (this.toastTimer) clearTimeout(this.toastTimer)

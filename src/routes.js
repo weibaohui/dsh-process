@@ -30,6 +30,11 @@ const { skeletonYaml } = require('./validate.js')
 const { buildZip } = require('./zip.js')
 const { randomUUID } = require('node:crypto')
 
+// 共享事件推送枢纽（@weibaohui/dsh-plugin-kit ≥0.4）：库缺席（未安装）时为
+// undefined，广播回退自有 SSE 通道——独立安装不受影响。
+let ensureHostHub
+try { ({ ensureHostHub } = require('@weibaohui/dsh-plugin-kit')) } catch { /* 库缺席 */ }
+
 const PREFIX = '/dsh-process'
 const MAX_BODY_BYTES = 4 * 1024 * 1024
 const SSE_HEARTBEAT_MS = 25_000
@@ -80,6 +85,12 @@ function registerRoutes(ctx, deps) {
   const clients = new Set()
 
   const broadcast = (event, data) => {
+    // 共享事件枢纽（dsh-plugin-kit ≥0.4）在就优先发布——页面只占一条 SSE;
+    // 库缺席回退自有 SSE 通道。帧形状 {event, data} 与自有 SSE 语义一致。
+    try {
+      const hub = ensureHostHub && ensureHostHub(ctx, { webServer: ctx.webServer, connection: ctx.connection })
+      if (hub && typeof hub.publish === 'function') hub.publish('dsh-process', { event, data })
+    } catch { /* 枢纽缺席不影响自有通道 */ }
     const frame = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
     for (const res of clients) { try { res.write(frame) } catch { clients.delete(res) } }
   }

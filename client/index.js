@@ -541,17 +541,31 @@ class Controller {
 
   start() {
     void this.refresh()
-    try { this.connectStream() } catch { /* EventSource 不可用：仅手动刷新 */ }
+    try { this.connectStream() } catch { /* 实时通道不可用：仅手动刷新 */ }
   }
   connectStream() {
-    const es = new EventSource(API + '/events')
-    this.es = es
-    const onFrame = (e) => {
-      try { const d = JSON.parse(e.data); this.seenRevision = d.revision; this.seenRunsRevision = d.runsRevision } catch {}
+    const onEvent = (event, payload) => {
+      if (event !== 'hello' && event !== 'change') return
+      try { this.seenRevision = payload.revision; this.seenRunsRevision = payload.runsRevision } catch (e) {}
       void this.refresh()
     }
-    es.addEventListener('hello', onFrame)
-    es.addEventListener('change', onFrame)
+    // 枢纽优先（dsh-plugin-kit ≥0.4 的共享单连接）；帧形状 {event, data}
+    if (typeof PluginKit !== 'undefined' && typeof PluginKit.connectEvents === 'function') {
+      this.hubOff = PluginKit.connectEvents('dsh-process', (data) => {
+        if (data && typeof data.event === 'string') onEvent(data.event, data.data)
+      }, () => {})
+      if (this.hubOff) return
+    }
+    const es = new EventSource(API + '/events')
+    this.es = es
+    es.addEventListener('hello', (e) => {
+      let d; try { d = JSON.parse(e.data) } catch (err) { return }
+      onEvent('hello', d)
+    })
+    es.addEventListener('change', (e) => {
+      let d; try { d = JSON.parse(e.data) } catch (err) { return }
+      onEvent('change', d)
+    })
     es.onerror = () => { /* EventSource 自动重连；hello 里对齐 gap */ }
   }
   async refresh() {
@@ -597,6 +611,7 @@ class Controller {
   }
   dispose() {
     this.disposed = true
+    if (this.hubOff) { try { this.hubOff() } catch {} }
     if (this.es) { try { this.es.close() } catch {} }
     if (this.validateTimer) clearTimeout(this.validateTimer)
     if (this.toastTimer) clearTimeout(this.toastTimer)
