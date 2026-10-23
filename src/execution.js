@@ -352,7 +352,9 @@ class ExecutionService {
     const timer = setInterval(pump, PUMP_MS)
     if (typeof timer.unref === 'function') timer.unref()
     try {
-      agent.followup({ content: [{ type: 'text', text: prompt }], source: { kind: 'plugin', plugin: 'dsh-process' } })
+      // v3 裸包装 {kind:'plugin', plugin:…} 在 format v4 宿主写路径抛 SessionFormatError
+      // （同 dsh-kb#1），必须用生产者自有写法 kind:'plugin:<名>'
+      agent.followup({ content: [{ type: 'text', text: prompt }], source: { kind: 'plugin:dsh-process' } })
       await agent.whenIdle()
     } finally {
       clearInterval(timer)
@@ -404,7 +406,7 @@ class ExecutionService {
       await agent.whenIdle()
       const firstSeq = agent.session.seq
       const eventList = () => sessionEventList(agent)
-      agent.followup({ content: [{ type: 'text', text: prompt }], source: { kind: 'plugin', plugin: 'dsh-process' } })
+      agent.followup({ content: [{ type: 'text', text: prompt }], source: { kind: 'plugin:dsh-process' } })
       const idle = agent.whenIdle()
       const timer = new Promise((resolve) => setTimeout(() => resolve('timeout'), JUDGE_TIMEOUT_MS))
       const outcome = await Promise.race([idle.then(() => 'done'), timer])
