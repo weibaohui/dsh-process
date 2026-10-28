@@ -303,7 +303,14 @@ window.__ModuleLoader__.load({
     const useLayoutEffect = __React.useLayoutEffect || useEffect // React shim 兜底
 
     const CLIENT_NAME = '@weibaohui/dsh-process'
-    const API = '/dsh-process'
+    // API 基址随页面走：子路径反代（如 https://host/app/dsh/）下，绝对路径 /dsh-process
+    // 会打到站点根而 404。与宿主官方客户端一致，用 document.baseURI 推导（dsh-sync#14 同款）。
+    const API = (() => {
+      try {
+        const base = (typeof document !== 'undefined' && document.baseURI) || (typeof location !== 'undefined' ? location.href : '/')
+        return new URL('dsh-process', new URL('.', base)).pathname.replace(/\/+$/, '')
+      } catch { return '/dsh-process' }
+    })()
     const NS = 'dshProcess'
     const PANEL_NAME = 'dsh-process'
     const ACTIVATE_EVENT = 'dsh-panel-activate'
